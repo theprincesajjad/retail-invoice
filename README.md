@@ -1,11 +1,13 @@
 # Retail Invoice System
 
-A DOS-style retail invoicing desktop app built with Python and CustomTkinter. Features keyboard-driven data entry, inventory management, sales reports, and thermal receipt printing on Windows.
+A classic POS-style retail invoicing desktop app built with Python and CustomTkinter. Features keyboard-driven data entry, inventory management, sales reports, and thermal receipt printing on Windows.
 
 ## Features
 
-- **DOS green-on-black UI** with sharp corners for a retro terminal feel
+- **Retro POS terminal UI** — dark blue background, magenta headers, teal inputs, white monospace text
 - **Keyboard shortcuts** for fast mouse-free operation
+- **Enter to add manual line items** — tab through Description → Qty → Price, press Enter to submit
+- **F7 payment cycling** — quickly switch Cash / Card / Other
 - **Invoice creation** with inventory lookup and manual line items
 - **Inventory management** with low-stock highlighting
 - **Sales reports** with monthly/quarterly/yearly filters
@@ -30,6 +32,8 @@ A DOS-style retail invoicing desktop app built with Python and CustomTkinter. Fe
 | Alt+S | Focus inventory search |
 | Alt+M | Focus manual item description |
 | Alt+A | Add manual item |
+| Enter | Add manual line (from Price field; tabs through fields) |
+| F7 | Cycle payment method (Cash → Card → Other) |
 | F12 | Print & save invoice |
 | F11 | Save invoice only |
 | F9 | Clear form |
@@ -59,7 +63,7 @@ python main.py
 
 Go to **[Releases](https://github.com/theprincesajjad/retail-invoice/releases)** and download the latest `RetailInvoice-x.x.x-Windows.exe`. Double-click to run — no install or extra folders needed.
 
-Current version: **1.0.0**
+Current version: **1.0.1**
 
 ## Building Windows .exe locally
 

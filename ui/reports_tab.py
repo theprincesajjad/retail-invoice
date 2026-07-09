@@ -4,10 +4,11 @@ from models import Invoice
 from utils import format_currency
 from datetime import datetime, timedelta
 import calendar
+from . import theme as T
 
 class ReportsTab(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master)
+        super().__init__(master, fg_color=T.BG, corner_radius=0)
         
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -21,24 +22,24 @@ class ReportsTab(ctk.CTkFrame):
         self.on_filter_change()
 
     def create_filters(self):
-        frame = ctk.CTkFrame(self, fg_color="#111111", corner_radius=0)
-        frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        frame = ctk.CTkFrame(self, **T.panel_kwargs())
+        frame.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
         
-        ctk.CTkLabel(frame, text="Period (Alt+P):", text_color="#00FF00").pack(side="left", padx=5)
+        ctk.CTkLabel(frame, text="Period (Alt+P):", **T.label_kwargs(text_color=T.LABEL_ACCENT)).pack(side="left", padx=8)
         self.period_var = ctk.StringVar(value="Monthly")
-        self.period_combo = ctk.CTkComboBox(frame, variable=self.period_var, values=["Monthly", "Quarterly", "Yearly"], command=self.on_filter_change, fg_color="#111111", text_color="#00FF00", border_color="#00FF00", button_color="#003300", button_hover_color="#00AA00", corner_radius=0)
+        self.period_combo = ctk.CTkComboBox(frame, variable=self.period_var, values=["Monthly", "Quarterly", "Yearly"], command=self.on_filter_change, **T.combo_kwargs(140))
         self.period_combo.pack(side="left", padx=5)
         
-        ctk.CTkLabel(frame, text="Date Range:", text_color="#00FF00").pack(side="left", padx=(20, 5))
+        ctk.CTkLabel(frame, text="Date Range:", **T.label_kwargs()).pack(side="left", padx=(20, 5))
         self.range_var = ctk.StringVar()
-        self.range_combo = ctk.CTkComboBox(frame, variable=self.range_var, values=[], command=self.load_invoices, fg_color="#111111", text_color="#00FF00", border_color="#00FF00", button_color="#003300", button_hover_color="#00AA00", corner_radius=0)
+        self.range_combo = ctk.CTkComboBox(frame, variable=self.range_var, values=[], command=self.load_invoices, **T.combo_kwargs(140))
         self.range_combo.pack(side="left", padx=5)
         
-        ctk.CTkButton(frame, text="Refresh (Alt+R)", command=self.load_invoices, fg_color="#003300", hover_color="#00AA00", text_color="#00FF00", corner_radius=0).pack(side="left", padx=20)
+        ctk.CTkButton(frame, text="Refresh (Alt+R)", command=self.load_invoices, **T.button_kwargs()).pack(side="left", padx=20)
 
     def create_summary(self):
-        self.summary_frame = ctk.CTkFrame(self, fg_color="#111111", corner_radius=0)
-        self.summary_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
+        self.summary_frame = ctk.CTkFrame(self, **T.panel_kwargs())
+        self.summary_frame.grid(row=1, column=0, sticky="ew", padx=8, pady=5)
         
         self.total_sales_var = ctk.StringVar(value="$0.00")
         self.total_tax_var = ctk.StringVar(value="$0.00")
@@ -53,26 +54,25 @@ class ReportsTab(ctk.CTkFrame):
         ]
         
         for i, (title, var) in enumerate(boxes):
-            box = ctk.CTkFrame(self.summary_frame, fg_color="#002200", corner_radius=0)
+            box = ctk.CTkFrame(self.summary_frame, fg_color=T.INPUT_BG, corner_radius=0)
             box.grid(row=0, column=i, padx=10, pady=10, sticky="ew")
             self.summary_frame.grid_columnconfigure(i, weight=1)
             
-            ctk.CTkLabel(box, text=title, font=("Consolas", 12), text_color="#00FF00").pack(pady=(10, 0))
-            ctk.CTkLabel(box, textvariable=var, font=("Consolas", 18, "bold"), text_color="#00FF00").pack(pady=(0, 10))
+            ctk.CTkLabel(box, text=title, font=T.FONT, text_color=T.INPUT_TEXT).pack(pady=(10, 0))
+            ctk.CTkLabel(box, textvariable=var, font=T.FONT_TOTAL, text_color=T.LABEL_ACCENT).pack(pady=(0, 10))
 
     def create_table(self):
-        self.table_frame = ctk.CTkScrollableFrame(self, fg_color="#111111", corner_radius=0)
-        self.table_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=5)
+        self.table_frame = ctk.CTkScrollableFrame(self, fg_color=T.BG, corner_radius=0)
+        self.table_frame.grid(row=2, column=0, sticky="nsew", padx=8, pady=5)
         
-        # Headers
         self.headers = ["Invoice #", "Date", "Customer", "Subtotal", "Tax", "Total", "Payment", "Action"]
         self.widths = [120, 150, 150, 80, 80, 100, 100, 100]
         
-        header_frame = ctk.CTkFrame(self.table_frame, fg_color="transparent")
+        header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.HEADER_BG, corner_radius=0)
         header_frame.pack(fill="x", pady=(0, 5))
         
         for text, width in zip(self.headers, self.widths):
-            ctk.CTkLabel(header_frame, text=text, width=width, anchor="w", font=("Consolas", 12, "bold"), text_color="#00FF00").pack(side="left", padx=5)
+            ctk.CTkLabel(header_frame, text=text, width=width, anchor="w", font=T.FONT_HEADER, text_color=T.HEADER_TEXT).pack(side="left", padx=5, pady=3)
             
         self.rows_frame = ctk.CTkFrame(self.table_frame, fg_color="transparent")
         self.rows_frame.pack(fill="both", expand=True)
@@ -156,15 +156,13 @@ class ReportsTab(ctk.CTkFrame):
             # Formatting date
             date_str = inv.created_at[:16] if inv.created_at else ""
             
-            ctk.CTkLabel(row, text=inv.invoice_number, width=self.widths[0], anchor="w", text_color="#00FF00").pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=date_str, width=self.widths[1], anchor="w", text_color="#00FF00").pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=inv.customer_name or "-", width=self.widths[2], anchor="w", text_color="#00FF00").pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=format_currency(inv.subtotal), width=self.widths[3], anchor="w", text_color="#00FF00").pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=format_currency(inv.tax_amount), width=self.widths[4], anchor="w", text_color="#00FF00").pack(side="left", padx=5)
-            
-            # Bold Total
-            ctk.CTkLabel(row, text=format_currency(inv.total), width=self.widths[5], anchor="w", font=("Consolas", 12, "bold"), text_color="#00FF00").pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=inv.payment_method, width=self.widths[6], anchor="w", text_color="#00FF00").pack(side="left", padx=5)
+            ctk.CTkLabel(row, text=inv.invoice_number, width=self.widths[0], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
+            ctk.CTkLabel(row, text=date_str, width=self.widths[1], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
+            ctk.CTkLabel(row, text=inv.customer_name or "-", width=self.widths[2], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
+            ctk.CTkLabel(row, text=format_currency(inv.subtotal), width=self.widths[3], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
+            ctk.CTkLabel(row, text=format_currency(inv.tax_amount), width=self.widths[4], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
+            ctk.CTkLabel(row, text=format_currency(inv.total), width=self.widths[5], anchor="w", font=T.FONT_BOLD, text_color=T.LABEL_ACCENT).pack(side="left", padx=5)
+            ctk.CTkLabel(row, text=inv.payment_method, width=self.widths[6], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
             
             # Action column
             actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[7])
@@ -173,7 +171,7 @@ class ReportsTab(ctk.CTkFrame):
             def make_reprint_cmd(invoice_obj):
                 return lambda: self.reprint_invoice(invoice_obj)
                 
-            ctk.CTkButton(actions, text="Reprint", width=80, command=make_reprint_cmd(inv), fg_color="#003300", hover_color="#00AA00", text_color="#00FF00", corner_radius=0).pack(side="left")
+            ctk.CTkButton(actions, text="Reprint", width=80, command=make_reprint_cmd(inv), **T.button_kwargs()).pack(side="left")
 
     def reprint_invoice(self, invoice):
         from printer import print_receipt

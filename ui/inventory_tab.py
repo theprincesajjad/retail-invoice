@@ -3,10 +3,11 @@ from tkinter import messagebox
 from database import add_product, update_product, delete_product, search_products
 from models import Product
 from utils import format_currency
+from . import theme as T
 
 class InventoryTab(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master)
+        super().__init__(master, fg_color=T.BG, corner_radius=0)
         
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -17,30 +18,29 @@ class InventoryTab(ctk.CTkFrame):
         self.load_products()
 
     def create_top_bar(self):
-        frame = ctk.CTkFrame(self, fg_color="#111111", corner_radius=0)
-        frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        frame = ctk.CTkFrame(self, **T.panel_kwargs())
+        frame.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
         
-        ctk.CTkButton(frame, text="+ Add Product (Alt+N)", fg_color="#003300", hover_color="#00AA00", text_color="#00FF00", corner_radius=0, command=self.show_product_dialog).pack(side="left", padx=5)
+        ctk.CTkButton(frame, text="+ Add Product (Alt+N)", command=self.show_product_dialog, **T.primary_button_kwargs()).pack(side="left", padx=8)
         
-        ctk.CTkLabel(frame, text="Search (Alt+S):", text_color="#00FF00").pack(side="left", padx=(20, 5))
+        ctk.CTkLabel(frame, text="Search (Alt+S):", **T.label_kwargs(text_color=T.LABEL_ACCENT)).pack(side="left", padx=(20, 5))
         self.search_var = ctk.StringVar()
-        self.search_entry = ctk.CTkEntry(frame, textvariable=self.search_var, width=200, fg_color="#111111", text_color="#00FF00", border_color="#00FF00", corner_radius=0)
+        self.search_entry = ctk.CTkEntry(frame, textvariable=self.search_var, **T.entry_kwargs(200))
         self.search_entry.pack(side="left", padx=5)
         self.search_entry.bind('<KeyRelease>', lambda e: self.load_products())
 
     def create_table(self):
-        self.table_frame = ctk.CTkScrollableFrame(self, fg_color="#111111", corner_radius=0)
-        self.table_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        self.table_frame = ctk.CTkScrollableFrame(self, fg_color=T.BG, corner_radius=0)
+        self.table_frame.grid(row=1, column=0, sticky="nsew", padx=8, pady=5)
         
-        # Headers
         self.headers = ["ID", "Name", "Serial Number", "SKU", "Qty", "Price", "Category", "Actions"]
         self.widths = [50, 200, 150, 100, 50, 100, 100, 150]
         
-        header_frame = ctk.CTkFrame(self.table_frame, fg_color="transparent")
+        header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.HEADER_BG, corner_radius=0)
         header_frame.pack(fill="x", pady=(0, 5))
         
         for text, width in zip(self.headers, self.widths):
-            ctk.CTkLabel(header_frame, text=text, width=width, anchor="w", font=("Consolas", 12, "bold"), text_color="#00FF00").pack(side="left", padx=5)
+            ctk.CTkLabel(header_frame, text=text, width=width, anchor="w", font=T.FONT_HEADER, text_color=T.HEADER_TEXT).pack(side="left", padx=5, pady=3)
             
         self.rows_frame = ctk.CTkFrame(self.table_frame, fg_color="transparent")
         self.rows_frame.pack(fill="both", expand=True)
@@ -57,7 +57,7 @@ class InventoryTab(ctk.CTkFrame):
             row.pack(fill="x", pady=2)
             
             # Highlight low stock
-            text_color = "#FF4444" if p.qty <= 3 else "#00FF00"
+            text_color = T.WARN if p.qty <= 3 else T.TEXT
             
             ctk.CTkLabel(row, text=str(p.id), width=self.widths[0], anchor="w", text_color=text_color).pack(side="left", padx=5)
             ctk.CTkLabel(row, text=p.name, width=self.widths[1], anchor="w", text_color=text_color).pack(side="left", padx=5)
@@ -70,9 +70,8 @@ class InventoryTab(ctk.CTkFrame):
             actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[7])
             actions.pack(side="left", padx=5)
             
-            ctk.CTkButton(actions, text="Edit", width=60, fg_color="#003300", hover_color="#00AA00", text_color="#00FF00", corner_radius=0, command=lambda prod=p: self.show_product_dialog(prod)).pack(side="left", padx=2)
-            ctk.CTkButton(actions, text="Del", width=60, fg_color="#330000", hover_color="#AA0000", text_color="#FF0000", corner_radius=0, 
-                         command=lambda prod=p: self.delete_product(prod)).pack(side="left", padx=2)
+            ctk.CTkButton(actions, text="Edit", width=60, command=lambda prod=p: self.show_product_dialog(prod), **T.button_kwargs()).pack(side="left", padx=2)
+            ctk.CTkButton(actions, text="Del", width=60, command=lambda prod=p: self.delete_product(prod), **T.danger_button_kwargs()).pack(side="left", padx=2)
 
     def delete_product(self, product: Product):
         if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete '{product.name}'?"):
@@ -84,7 +83,7 @@ class InventoryTab(ctk.CTkFrame):
         dialog = ctk.CTkToplevel(self)
         dialog.title("Edit Product" if product else "Add Product")
         dialog.geometry("400x500")
-        dialog.configure(fg_color="#000000")
+        dialog.configure(fg_color=T.BG)
         dialog.grab_set() # Modal
         
         entries = {}
@@ -99,8 +98,8 @@ class InventoryTab(ctk.CTkFrame):
         ]
         
         for i, (label_text, key) in enumerate(fields):
-            ctk.CTkLabel(dialog, text=label_text, text_color="#00FF00").grid(row=i, column=0, padx=20, pady=10, sticky="w")
-            entry = ctk.CTkEntry(dialog, width=200, fg_color="#111111", text_color="#00FF00", border_color="#00FF00", corner_radius=0)
+            ctk.CTkLabel(dialog, text=label_text, **T.label_kwargs(text_color=T.LABEL_ACCENT)).grid(row=i, column=0, padx=20, pady=10, sticky="w")
+            entry = ctk.CTkEntry(dialog, **T.entry_kwargs(200))
             entry.grid(row=i, column=1, padx=20, pady=10)
             entries[key] = entry
             
@@ -147,4 +146,4 @@ class InventoryTab(ctk.CTkFrame):
             except ValueError as e:
                 messagebox.showerror("Validation Error", str(e))
                 
-        ctk.CTkButton(dialog, text="Save", fg_color="#00AA00", hover_color="#00FF00", text_color="#000000", corner_radius=0, command=save).grid(row=len(fields), column=0, columnspan=2, pady=20)
+        ctk.CTkButton(dialog, text="Save", command=save, **T.primary_button_kwargs()).grid(row=len(fields), column=0, columnspan=2, pady=20)
