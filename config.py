@@ -26,7 +26,12 @@ DEFAULT_SETTINGS = {
     "tax_rate": "0.13",
     "logo_path": str(ASSETS_DIR / "logo.png"),
     "printer_name": "",
-    "receipt_width": "80mm"
+    "receipt_width": "80mm",
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": "587",
+    "smtp_email": "",
+    "smtp_password": "",
+    "smtp_from_name": "My Business",
 }
 
 def get_db_connection():

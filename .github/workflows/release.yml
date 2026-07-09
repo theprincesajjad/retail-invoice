@@ -56,6 +56,8 @@ jobs:
           --hidden-import escpos
           --hidden-import win32print
           --hidden-import win32api
+          --hidden-import reportlab
+          --hidden-import reportlab.pdfgen.canvas
           main.py
 
       - name: Rename release binary

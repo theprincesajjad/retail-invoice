@@ -11,22 +11,28 @@ class SettingsTab(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master, fg_color=T.BG, corner_radius=0)
 
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
 
         self.entries = {}
+        self.password_entries = {}
         self.load_ui()
         self.load_settings()
 
     def load_ui(self):
-        bus_frame = ctk.CTkFrame(self, **T.card_kwargs())
-        bus_frame.grid(row=0, column=0, padx=4, pady=4, sticky="nsew")
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        scroll.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
 
+        grid = ctk.CTkFrame(scroll, fg_color="transparent")
+        grid.pack(fill="both", expand=True)
+        grid.grid_columnconfigure(0, weight=1)
+        grid.grid_columnconfigure(1, weight=1)
+
+        bus_frame = ctk.CTkFrame(grid, **T.card_kwargs())
+        bus_frame.grid(row=0, column=0, padx=(0, 6), pady=4, sticky="nsew")
         bus_inner = ctk.CTkFrame(bus_frame, fg_color="transparent")
         bus_inner.pack(fill="both", expand=True, padx=24, pady=24)
-
-        T.section_title(bus_inner, "Business", "Shown on printed receipts").pack(anchor="w", pady=(0, 16))
-
+        T.section_title(bus_inner, "Business", "Shown on receipts and emails").pack(anchor="w", pady=(0, 16))
         for label, key in [
             ("Business name", "business_name"),
             ("Address", "business_address"),
@@ -34,18 +40,13 @@ class SettingsTab(ctk.CTkFrame):
             ("GST/HST number", "gst_number"),
             ("Tax rate (0.13 = 13%)", "tax_rate"),
         ]:
-            ctk.CTkLabel(bus_inner, text=label, **T.label_secondary()).pack(anchor="w", pady=(0, 4))
-            entry = ctk.CTkEntry(bus_inner, **T.entry_kwargs())
-            entry.pack(fill="x", pady=(0, 12))
-            self.entries[key] = entry
+            self._field(bus_inner, label, key)
 
-        print_frame = ctk.CTkFrame(self, **T.card_kwargs())
-        print_frame.grid(row=0, column=1, padx=4, pady=4, sticky="nsew")
-
+        print_frame = ctk.CTkFrame(grid, **T.card_kwargs())
+        print_frame.grid(row=0, column=1, padx=(6, 0), pady=4, sticky="nsew")
         pr_inner = ctk.CTkFrame(print_frame, fg_color="transparent")
         pr_inner.pack(fill="both", expand=True, padx=24, pady=24)
-
-        T.section_title(pr_inner, "Printer", "Windows shared printer name").pack(anchor="w", pady=(0, 16))
+        T.section_title(pr_inner, "Printer", "Windows shared printer").pack(anchor="w", pady=(0, 16))
 
         ctk.CTkLabel(pr_inner, text="Logo", **T.label_secondary()).pack(anchor="w")
         logo_row = ctk.CTkFrame(pr_inner, fg_color="transparent")
@@ -54,23 +55,71 @@ class SettingsTab(ctk.CTkFrame):
         self.entries["logo_path"].pack(side="left", fill="x", expand=True, padx=(0, 8))
         ctk.CTkButton(logo_row, text="Browse", command=self.browse_logo, **T.button_kwargs(width=72)).pack(side="left")
 
-        ctk.CTkLabel(pr_inner, text="Printer name", **T.label_secondary()).pack(anchor="w", pady=(0, 4))
-        self.entries["printer_name"] = ctk.CTkEntry(pr_inner, placeholder_text="EPSON TM-T20 Receipt", **T.entry_kwargs())
-        self.entries["printer_name"].pack(fill="x", pady=(0, 12))
+        self._field(pr_inner, "Printer name", "printer_name", placeholder="EPSON TM-T20 Receipt")
 
         ctk.CTkLabel(pr_inner, text="Receipt width", **T.label_secondary()).pack(anchor="w", pady=(0, 4))
         self.width_var = ctk.StringVar(value="80mm")
         w_row = ctk.CTkFrame(pr_inner, fg_color="transparent")
-        w_row.pack(anchor="w")
+        w_row.pack(anchor="w", pady=(0, 8))
         for val in ("80mm", "58mm"):
             ctk.CTkRadioButton(
                 w_row, text=val, variable=self.width_var, value=val,
                 font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
             ).pack(side="left", padx=(0, 16))
 
-        save_f = ctk.CTkFrame(self, fg_color="transparent")
-        save_f.grid(row=1, column=0, columnspan=2, pady=16)
-        ctk.CTkButton(save_f, text="Save settings", command=self.save_settings, **T.primary_button_kwargs(width=160)).pack()
+        email_frame = ctk.CTkFrame(grid, **T.card_kwargs())
+        email_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=8)
+        em_inner = ctk.CTkFrame(email_frame, fg_color="transparent")
+        em_inner.pack(fill="x", padx=24, pady=24)
+        T.section_title(
+            em_inner,
+            "Email (Gmail SMTP)",
+            "Use a Google App Password — not your regular Gmail password",
+        ).pack(anchor="w", pady=(0, 16))
+
+        row1 = ctk.CTkFrame(em_inner, fg_color="transparent")
+        row1.pack(fill="x")
+        row1.grid_columnconfigure((0, 1, 2), weight=1)
+
+        for col, (label, key, ph) in enumerate([
+            ("SMTP host", "smtp_host", "smtp.gmail.com"),
+            ("Port", "smtp_port", "587"),
+            ("From name", "smtp_from_name", "My Business"),
+        ]):
+            colf = ctk.CTkFrame(row1, fg_color="transparent")
+            colf.grid(row=0, column=col, sticky="ew", padx=(0 if col == 0 else 8, 0))
+            ctk.CTkLabel(colf, text=label, **T.label_secondary()).pack(anchor="w", pady=(0, 4))
+            e = ctk.CTkEntry(colf, placeholder_text=ph, **T.entry_kwargs())
+            e.pack(fill="x")
+            self.entries[key] = e
+
+        row2 = ctk.CTkFrame(em_inner, fg_color="transparent")
+        row2.pack(fill="x", pady=(12, 0))
+        row2.grid_columnconfigure((0, 1), weight=1)
+
+        for col, (label, key, secret) in enumerate([
+            ("Gmail address", "smtp_email", False),
+            ("App password", "smtp_password", True),
+        ]):
+            colf = ctk.CTkFrame(row2, fg_color="transparent")
+            colf.grid(row=0, column=col, sticky="ew", padx=(0 if col == 0 else 8, 0))
+            ctk.CTkLabel(colf, text=label, **T.label_secondary()).pack(anchor="w", pady=(0, 4))
+            e = ctk.CTkEntry(colf, placeholder_text="you@gmail.com" if not secret else "16-character app password", show="*" if secret else None, **T.entry_kwargs())
+            e.pack(fill="x")
+            self.entries[key] = e
+
+        save_f = ctk.CTkFrame(scroll, fg_color="transparent")
+        save_f.pack(fill="x", pady=12)
+        ctk.CTkButton(save_f, text="Save settings", command=self.save_settings, **T.primary_button_kwargs(width=180)).pack()
+
+    def _field(self, parent, label, key, placeholder=""):
+        ctk.CTkLabel(parent, text=label, **T.label_secondary()).pack(anchor="w", pady=(0, 4))
+        kw = T.entry_kwargs()
+        if placeholder:
+            kw["placeholder_text"] = placeholder
+        entry = ctk.CTkEntry(parent, **kw)
+        entry.pack(fill="x", pady=(0, 12))
+        self.entries[key] = entry
 
     def browse_logo(self):
         filepath = filedialog.askopenfilename(

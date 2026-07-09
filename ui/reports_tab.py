@@ -1,9 +1,11 @@
 import customtkinter as ctk
+from tkinter import messagebox
 from database import search_invoices
 from utils import format_currency
 from datetime import datetime, timedelta
 import calendar
 from . import theme as T
+from .receipt_viewer import show_receipt_viewer
 
 
 class ReportsTab(ctk.CTkFrame):
@@ -27,7 +29,7 @@ class ReportsTab(ctk.CTkFrame):
         inner = ctk.CTkFrame(card, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=14)
 
-        ctk.CTkLabel(inner, text="Period", **T.label_secondary()).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(inner, text="Period  ·  Alt+P", **T.label_secondary()).pack(side="left", padx=(0, 8))
         self.period_var = ctk.StringVar(value="Monthly")
         self.period_combo = ctk.CTkComboBox(
             inner, variable=self.period_var, values=["Monthly", "Quarterly", "Yearly"],
@@ -42,16 +44,18 @@ class ReportsTab(ctk.CTkFrame):
         )
         self.range_combo.pack(side="left", padx=(0, 24))
 
-        ctk.CTkLabel(inner, text="Search", **T.label_secondary()).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(inner, text="Search  ·  Alt+S", **T.label_secondary()).pack(side="left", padx=(0, 8))
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
             inner, textvariable=self.search_var,
-            placeholder_text="Name, phone, or product…", **T.entry_kwargs(220),
+            placeholder_text="Name, phone, or product…", **T.entry_kwargs(240),
         )
         self.search_entry.pack(side="left", padx=(0, 8))
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_invoices())
 
-        ctk.CTkButton(inner, text="Refresh", command=self.load_invoices, **T.button_kwargs(width=80)).pack(side="left")
+        ctk.CTkButton(
+            inner, text=T.with_shortcut("Refresh", "Alt+R"), command=self.load_invoices, **T.button_kwargs(width=120),
+        ).pack(side="left")
 
     def create_summary(self):
         self.summary_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -83,8 +87,8 @@ class ReportsTab(ctk.CTkFrame):
         self.table_frame = ctk.CTkScrollableFrame(card, fg_color=T.SURFACE, corner_radius=0)
         self.table_frame.grid(row=0, column=0, sticky="nsew")
 
-        self.headers = ["Invoice", "Date", "Customer", "Phone", "Subtotal", "Discount", "Tax", "Total", "Pay", ""]
-        self.widths = [110, 130, 130, 110, 80, 72, 72, 88, 56, 72]
+        self.headers = ["Invoice", "Date", "Customer", "Phone", "Total", "Pay", "Actions"]
+        self.widths = [110, 120, 140, 110, 88, 56, 200]
 
         header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.SURFACE_ALT, corner_radius=0)
         header_frame.pack(fill="x", padx=12, pady=(12, 4))
@@ -151,31 +155,62 @@ class ReportsTab(ctk.CTkFrame):
         self.avg_invoice_var.set(format_currency(avg))
 
         for i, inv in enumerate(invoices):
-            row = ctk.CTkFrame(self.rows_frame, fg_color=T.SURFACE_ALT if i % 2 == 0 else "transparent", corner_radius=T.RADIUS_SM)
+            row = ctk.CTkFrame(
+                self.rows_frame,
+                fg_color=T.SURFACE_ALT if i % 2 == 0 else "transparent",
+                corner_radius=T.RADIUS_SM,
+            )
             row.pack(fill="x", pady=1)
 
             date_str = inv.created_at[:16] if inv.created_at else ""
-            disc = format_currency(inv.discount_amount) if inv.discount_amount else "—"
             cells = [
                 inv.invoice_number, date_str, inv.customer_name or "—", inv.customer_phone or "—",
-                format_currency(inv.subtotal), disc, format_currency(inv.tax_amount),
                 format_currency(inv.total), inv.payment_method,
             ]
             for text, width in zip(cells, self.widths[:-1]):
-                ctk.CTkLabel(row, text=text, width=width, anchor="w", font=T.FONT, text_color=T.TEXT).pack(side="left", padx=4, pady=8)
+                ctk.CTkLabel(row, text=text, width=width, anchor="w", font=T.FONT, text_color=T.TEXT).pack(
+                    side="left", padx=4, pady=8
+                )
 
             actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[-1])
             actions.pack(side="left", padx=4)
             ctk.CTkButton(
-                actions, text="Print", width=64,
-                command=lambda inv_obj=inv: self.reprint_invoice(inv_obj),
+                actions, text="View", width=52, command=lambda inv_obj=inv: self.view_invoice(inv_obj),
                 **T.button_kwargs(height=30),
-            ).pack(side="left")
+            ).pack(side="left", padx=2)
+            ctk.CTkButton(
+                actions, text="Print", width=52, command=lambda inv_obj=inv: self.reprint_invoice(inv_obj),
+                **T.button_kwargs(height=30),
+            ).pack(side="left", padx=2)
+            ctk.CTkButton(
+                actions, text="Email", width=52, command=lambda inv_obj=inv: self.email_invoice(inv_obj),
+                **T.button_kwargs(height=30),
+            ).pack(side="left", padx=2)
+
+    def view_invoice(self, invoice):
+        show_receipt_viewer(self.winfo_toplevel(), invoice, invoice.items)
 
     def reprint_invoice(self, invoice):
         from printer import print_receipt
-        from tkinter import messagebox
         if print_receipt(invoice, invoice.items):
-            self.winfo_toplevel().set_status(f"Reprinted {invoice.invoice_number}")
+            self.winfo_toplevel().set_status(f"Printed {invoice.invoice_number}")
         else:
             messagebox.showerror("Print failed", "Check printer settings and try again.")
+
+    def email_invoice(self, invoice):
+        from email_service import send_receipt_email
+
+        default = ""
+        dialog = ctk.CTkInputDialog(
+            text=f"Send receipt for {invoice.invoice_number} to:",
+            title="Email receipt",
+        )
+        to_addr = dialog.get_input()
+        if not to_addr:
+            return
+        ok, msg = send_receipt_email(to_addr, invoice, invoice.items)
+        if ok:
+            self.winfo_toplevel().set_status(msg)
+            messagebox.showinfo("Email sent", msg)
+        else:
+            messagebox.showerror("Email failed", msg)

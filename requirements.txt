@@ -2,5 +2,6 @@ customtkinter>=5.2.0
 python-escpos>=3.0
 pywin32>=306
 Pillow>=10.0
+reportlab>=4.0
 pytest>=8.0
 pyinstaller>=6.0
