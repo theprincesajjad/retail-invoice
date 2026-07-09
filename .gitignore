@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+
+# Build artifacts
+build/
+dist/
+*.spec.bak
+
+# Database (local user data)
+data/*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Dev migration scripts (one-time use)
+refactor_*.py
