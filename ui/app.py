@@ -14,7 +14,7 @@ TAB_SETTINGS = "Settings (F4)"
 
 SHORTCUT_HELP = {
     TAB_HOME: "Alt+C name · Alt+S stock · Enter add · Alt+D discount · F7 pay · F9 clear · F11 save · F12 print",
-    TAB_INVENTORY: "Alt+N new product · Alt+S search · Ctrl+S save product",
+    TAB_INVENTORY: "Alt+N new product · Alt+S search · Tab moves between fields in form",
     TAB_REPORTS: "Alt+S search · Alt+P period · Alt+R refresh · View · Print · Email",
     TAB_SETTINGS: "Save settings at bottom",
 }

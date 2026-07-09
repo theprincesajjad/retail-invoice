@@ -10,6 +10,7 @@ class InventoryTab(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master, fg_color=T.BG, corner_radius=0)
 
+        self._product_dialog = None
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -89,33 +90,56 @@ class InventoryTab(ctk.CTkFrame):
             self.winfo_toplevel().set_status(f"Deleted {product.name}")
 
     def show_product_dialog(self, product: Product = None):
+        if self._product_dialog is not None:
+            try:
+                if self._product_dialog.winfo_exists():
+                    self._product_dialog.lift()
+                    self._product_dialog.focus_force()
+                    return
+            except Exception:
+                self._product_dialog = None
+
         is_new = product is None
-        dialog = ctk.CTkToplevel(self)
+        parent = self.winfo_toplevel()
+
+        dialog = ctk.CTkToplevel(parent)
+        self._product_dialog = dialog
         dialog.title("New product" if is_new else "Edit product")
-        dialog.geometry("480x580")
-        dialog.minsize(440, 520)
+
+        width, height = 460, 540
         dialog.configure(fg_color=T.BG)
-        dialog.resizable(True, True)
-        dialog.grab_set()
-        dialog.transient(self.winfo_toplevel())
+        dialog.resizable(False, False)
+        dialog.geometry(f"{width}x{height}")
+        dialog.minsize(width, height)
+        dialog.maxsize(width, height)
+        dialog.transient(parent)
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
 
-        outer = ctk.CTkFrame(dialog, fg_color="transparent")
-        outer.pack(fill="both", expand=True, padx=20, pady=20)
+        def close_dialog():
+            dialog.destroy()
 
-        card = ctk.CTkFrame(outer, **T.card_kwargs())
-        card.pack(fill="both", expand=True)
+        dialog.bind("<Destroy>", lambda e: setattr(self, "_product_dialog", None))
 
-        scroll = ctk.CTkScrollableFrame(card, fg_color="transparent", corner_radius=0)
-        scroll.pack(fill="both", expand=True, padx=4, pady=4)
+        card = ctk.CTkFrame(dialog, **T.card_kwargs())
+        card.pack(fill="both", expand=True, padx=20, pady=20)
 
-        inner = ctk.CTkFrame(scroll, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=20)
+        header = ctk.CTkFrame(card, fg_color="transparent")
+        header.pack(fill="x", padx=24, pady=(22, 6))
+        ctk.CTkLabel(
+            header,
+            text="New product" if is_new else "Edit product",
+            font=T.FONT_HEADLINE,
+            text_color=T.TEXT,
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            header,
+            text="Tab — next field · Enter — next field · Ctrl+S — save · Esc — close",
+            **T.label_secondary(),
+        ).pack(anchor="w", pady=(6, 0))
 
-        ctk.CTkLabel(inner, text="Add product" if is_new else "Edit product", font=T.FONT_HEADLINE, text_color=T.TEXT).pack(
-            anchor="w"
-        )
-        hint = "Enter moves to next field · Ctrl+S saves" + (" · opens next product" if is_new else "")
-        ctk.CTkLabel(inner, text=hint, **T.label_secondary()).pack(anchor="w", pady=(4, 18))
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=24, pady=(10, 8))
+        body.grid_columnconfigure(0, weight=1)
 
         entries = {}
         field_defs = [
@@ -127,10 +151,10 @@ class InventoryTab(ctk.CTkFrame):
         ]
 
         ordered_entries = []
-        for label, key, placeholder in field_defs:
-            ctk.CTkLabel(inner, text=label, **T.label_secondary()).pack(anchor="w", pady=(0, 4))
-            entry = ctk.CTkEntry(inner, placeholder_text=placeholder, **T.entry_kwargs())
-            entry.pack(fill="x", pady=(0, 14))
+        for row, (label, key, placeholder) in enumerate(field_defs):
+            ctk.CTkLabel(body, text=label, **T.label_secondary()).grid(row=row * 2, column=0, sticky="w", pady=(0, 4))
+            entry = ctk.CTkEntry(body, placeholder_text=placeholder, **T.entry_kwargs(width=360))
+            entry.grid(row=row * 2 + 1, column=0, sticky="ew", pady=(0, 12))
             entries[key] = entry
             ordered_entries.append(entry)
 
@@ -143,6 +167,9 @@ class InventoryTab(ctk.CTkFrame):
         else:
             entries["qty"].insert(0, "1")
             entries["price"].insert(0, "0.00")
+
+        footer = ctk.CTkFrame(card, fg_color="transparent")
+        footer.pack(fill="x", padx=24, pady=(4, 22))
 
         def save(add_another=False):
             try:
@@ -167,44 +194,67 @@ class InventoryTab(ctk.CTkFrame):
 
                 if product:
                     update_product(new_product)
-                    self.winfo_toplevel().set_status(f"Updated {name}")
-                    dialog.destroy()
+                    parent.set_status(f"Updated {name}")
+                    close_dialog()
                 else:
                     add_product(new_product)
-                    self.winfo_toplevel().set_status(f"Added {name}")
-                    dialog.destroy()
+                    parent.set_status(f"Added {name}")
+                    close_dialog()
                     if add_another:
-                        self.after(80, self.show_product_dialog)
+                        self.after(120, self.show_product_dialog)
 
                 self.load_products()
             except ValueError as e:
-                messagebox.showerror("Validation", str(e))
+                messagebox.showerror("Validation", str(e), parent=dialog)
 
-        def save_and_next():
-            save(add_another=True)
+        def focus_next(index: int):
+            ordered_entries[(index + 1) % len(ordered_entries)].focus_set()
 
-        for i, entry in enumerate(ordered_entries[:-1]):
-            entry.bind("<Return>", lambda e, n=ordered_entries[i + 1]: (n.focus_set(), "break")[1])
-            entry.bind("<KP_Enter>", lambda e, n=ordered_entries[i + 1]: (n.focus_set(), "break")[1])
-        ordered_entries[-1].bind("<Return>", lambda e: (save_and_next() if is_new else save(False), "break")[1])
-        ordered_entries[-1].bind("<KP_Enter>", lambda e: (save_and_next() if is_new else save(False), "break")[1])
+        def focus_prev(index: int):
+            ordered_entries[(index - 1) % len(ordered_entries)].focus_set()
 
-        btn_row = ctk.CTkFrame(inner, fg_color="transparent")
-        btn_row.pack(fill="x", pady=(12, 4))
-        ctk.CTkButton(btn_row, text="Cancel", command=dialog.destroy, **T.button_kwargs()).pack(side="left")
+        for i, entry in enumerate(ordered_entries):
+            if i < len(ordered_entries) - 1:
+                entry.bind("<Return>", lambda e, idx=i: (focus_next(idx), "break")[1])
+                entry.bind("<KP_Enter>", lambda e, idx=i: (focus_next(idx), "break")[1])
+            else:
+                entry.bind("<Return>", lambda e: (save(add_another=is_new), "break")[1])
+                entry.bind("<KP_Enter>", lambda e: (save(add_another=is_new), "break")[1])
+            entry.bind("<Tab>", lambda e, idx=i: (focus_next(idx), "break")[1])
+            entry.bind("<Shift-Tab>", lambda e, idx=i: (focus_prev(idx), "break")[1])
+
+        ctk.CTkButton(footer, text="Cancel", command=close_dialog, **T.button_kwargs(width=96)).pack(side="left")
         if is_new:
             ctk.CTkButton(
-                btn_row,
-                text=T.with_shortcut("Save & next", "Ctrl+S"),
-                command=save_and_next,
-                **T.primary_button_kwargs(width=150, height=38),
+                footer,
+                text="Save & next",
+                command=lambda: save(add_another=True),
+                **T.button_kwargs(width=120),
             ).pack(side="right", padx=(8, 0))
         ctk.CTkButton(
-            btn_row,
-            text=T.with_shortcut("Save", "Ctrl+S"),
-            command=lambda: save(False),
-            **T.primary_button_kwargs(width=120, height=38),
+            footer,
+            text="Save",
+            command=lambda: save(add_another=False),
+            **T.primary_button_kwargs(width=96, height=38),
         ).pack(side="right")
 
-        dialog.bind("<Control-s>", lambda e: save_and_next() if is_new else save(False))
+        def on_ctrl_s(event=None):
+            save(add_another=False)
+            return "break"
+
+        dialog.bind("<Control-s>", on_ctrl_s)
+        dialog.bind("<Escape>", lambda e: (close_dialog(), "break")[1])
+
+        parent.update_idletasks()
+        px = parent.winfo_rootx() + max(0, (parent.winfo_width() - width) // 2)
+        py = parent.winfo_rooty() + max(0, (parent.winfo_height() - height) // 2)
+        dialog.geometry(f"{width}x{height}+{px}+{py}")
+
+        dialog.update_idletasks()
+        dialog.deiconify()
+        dialog.lift()
+        dialog.attributes("-topmost", True)
+        dialog.after(50, lambda: dialog.attributes("-topmost", False))
+        dialog.grab_set()
+        dialog.focus_force()
         entries["sku"].focus_set()
