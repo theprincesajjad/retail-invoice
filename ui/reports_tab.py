@@ -192,10 +192,11 @@ class ReportsTab(ctk.CTkFrame):
 
     def reprint_invoice(self, invoice):
         from printer import print_receipt
-        if print_receipt(invoice, invoice.items):
+        ok, msg = print_receipt(invoice, invoice.items)
+        if ok:
             self.winfo_toplevel().set_status(f"Printed {invoice.invoice_number}")
         else:
-            messagebox.showerror("Print failed", "Check printer settings and try again.")
+            messagebox.showerror("Print failed", msg)
 
     def email_invoice(self, invoice):
         from email_service import send_receipt_email

@@ -169,10 +169,22 @@ class SettingsTab(ctk.CTkFrame):
 
         printers = sorted(set([p for p in printers if p]))
         self.printer_combo.configure(values=printers)
-        if printers and not self.printer_var.get():
-            self.printer_var.set(printers[0])
+
+        preferred = ""
+        saved = self.entries["printer_name"].get().strip() or self.printer_var.get().strip()
+        if saved:
+            preferred = next((p for p in printers if p.lower() == saved.lower()), "")
+            if not preferred:
+                preferred = next((p for p in printers if saved.lower() in p.lower() or p.lower() in saved.lower()), "")
+        if not preferred:
+            preferred = next((p for p in printers if "tm-t20" in p.lower()), "")
+        if not preferred and printers:
+            preferred = printers[0]
+
+        if preferred:
+            self.printer_var.set(preferred)
             self.entries["printer_name"].delete(0, "end")
-            self.entries["printer_name"].insert(0, printers[0])
+            self.entries["printer_name"].insert(0, preferred)
 
         # Keep manual field in sync when selecting from combo
         def _sync(*_):
@@ -197,7 +209,13 @@ class SettingsTab(ctk.CTkFrame):
     def save_settings(self):
         try:
             for key, entry in self.entries.items():
+                if key == "printer_name":
+                    continue
                 save_setting(key, entry.get().strip())
+            printer = self.printer_var.get().strip() or self.entries["printer_name"].get().strip()
+            save_setting("printer_name", printer)
+            self.entries["printer_name"].delete(0, "end")
+            self.entries["printer_name"].insert(0, printer)
             save_setting("receipt_width", self.width_var.get())
             self.winfo_toplevel().set_status("Settings saved")
             messagebox.showinfo("Saved", "Settings have been saved.")

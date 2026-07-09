@@ -37,20 +37,10 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title(f"Retail Invoice  {get_app_version()}")
-        # Launch sized to the current screen and maximize where supported,
-        # so action buttons are never cut off on smaller displays.
-        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        self.geometry(f"{max(1100, sw)}x{max(720, sh)}+0+0")
-        self.minsize(1020, 680)
-        try:
-            if platform.system() == "Windows":
-                # Most reliable "full screen" behavior for desktop apps.
-                self.state("zoomed")
-            else:
-                self.attributes("-zoomed", True)
-        except Exception:
-            pass
+        self.geometry("1200x760")
+        self.minsize(1000, 640)
         self.configure(fg_color=T.BG)
+        self.after(80, self._maximize_window)
 
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -63,6 +53,15 @@ class App(ctk.CTk):
         self.tabview.set(TAB_HOME)
         self.after(150, self.invoice_tab.focus_customer)
         self.shortcut_var.set(SHORTCUT_HELP[TAB_HOME])
+
+    def _maximize_window(self):
+        try:
+            if platform.system() == "Windows":
+                self.state("zoomed")
+            else:
+                self.attributes("-zoomed", True)
+        except Exception:
+            pass
 
     def _build_header(self):
         header = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=58, border_width=0)
@@ -80,7 +79,7 @@ class App(ctk.CTk):
 
     def _build_tabs(self):
         shell = ctk.CTkFrame(self, fg_color=T.BG, corner_radius=0)
-        shell.grid(row=1, column=0, sticky="nsew", padx=22, pady=(10, 10))
+        shell.grid(row=1, column=0, sticky="nsew", padx=16, pady=(6, 6))
         shell.grid_rowconfigure(0, weight=1)
         shell.grid_columnconfigure(0, weight=1)
 

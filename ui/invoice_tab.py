@@ -19,8 +19,9 @@ class InvoiceTab(ctk.CTkFrame):
         self._tax_caption_prefix = "Tax"
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=0, minsize=320)
+        self.grid_columnconfigure(1, weight=0, minsize=300)
         self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=0)
 
         self._build_customer_row()
         self._build_main_area()
@@ -136,10 +137,15 @@ class InvoiceTab(ctk.CTkFrame):
         self.item_rows_frame.pack(fill="both", expand=True, padx=4, pady=(0, 8))
 
     def _build_sidebar(self):
-        side = ctk.CTkFrame(self, fg_color="transparent", width=320)
+        side = ctk.CTkFrame(self, fg_color="transparent", width=300)
         side.grid(row=1, column=1, sticky="nsew", padx=(0, 4), pady=4)
+        side.grid_rowconfigure(0, weight=1)
+        side.grid_columnconfigure(0, weight=1)
 
-        summary = ctk.CTkFrame(side, **T.card_kwargs())
+        scroll = ctk.CTkScrollableFrame(side, fg_color="transparent", corner_radius=0)
+        scroll.grid(row=0, column=0, sticky="nsew")
+
+        summary = ctk.CTkFrame(scroll, **T.card_kwargs())
         summary.pack(fill="x", pady=(0, 8))
 
         s_inner = ctk.CTkFrame(summary, fg_color="transparent")
@@ -156,7 +162,7 @@ class InvoiceTab(ctk.CTkFrame):
         ctk.CTkLabel(s_inner, text="Total", **T.label_secondary()).pack(anchor="w")
         self.total_label.pack(anchor="e", pady=(0, 4))
 
-        discount_card = ctk.CTkFrame(side, **T.card_kwargs())
+        discount_card = ctk.CTkFrame(scroll, **T.card_kwargs())
         discount_card.pack(fill="x", pady=(0, 8))
         d_inner = ctk.CTkFrame(discount_card, fg_color="transparent")
         d_inner.pack(fill="x", padx=20, pady=16)
@@ -180,7 +186,7 @@ class InvoiceTab(ctk.CTkFrame):
         self.discount_entry.pack(fill="x")
         self.discount_entry.bind("<KeyRelease>", lambda e: self.refresh_items())
 
-        pay_card = ctk.CTkFrame(side, **T.card_kwargs())
+        pay_card = ctk.CTkFrame(scroll, **T.card_kwargs())
         pay_card.pack(fill="x", pady=(0, 8))
         p_inner = ctk.CTkFrame(pay_card, fg_color="transparent")
         p_inner.pack(fill="x", padx=20, pady=16)
@@ -195,7 +201,7 @@ class InvoiceTab(ctk.CTkFrame):
                 font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
             ).pack(side="left", padx=(0, 12))
 
-        notes_card = ctk.CTkFrame(side, **T.card_kwargs())
+        notes_card = ctk.CTkFrame(scroll, **T.card_kwargs())
         notes_card.pack(fill="x", pady=(0, 8))
         n_inner = ctk.CTkFrame(notes_card, fg_color="transparent")
         n_inner.pack(fill="x", padx=20, pady=16)
@@ -203,22 +209,34 @@ class InvoiceTab(ctk.CTkFrame):
         self.notes_entry = ctk.CTkEntry(n_inner, placeholder_text="Optional", **T.entry_kwargs())
         self.notes_entry.pack(fill="x", pady=(6, 0))
 
-        actions = ctk.CTkFrame(side, fg_color="transparent")
-        actions.pack(fill="x")
+        self._build_action_dock()
+
+    def _build_action_dock(self):
+        """Pinned bottom bar so Save/Print are always visible."""
+        dock = ctk.CTkFrame(self, **T.card_kwargs())
+        dock.grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 4))
+
+        inner = ctk.CTkFrame(dock, fg_color="transparent")
+        inner.pack(fill="x", padx=20, pady=12)
+
         ctk.CTkButton(
-            actions,
+            inner,
             text=T.with_shortcut("Print & save", "F12"),
             command=lambda: self.save(print_rcpt=True),
-            **T.primary_button_kwargs(),
-        ).pack(fill="x", pady=(0, 8))
-        row = ctk.CTkFrame(actions, fg_color="transparent")
-        row.pack(fill="x")
+            **T.primary_button_kwargs(width=180, height=42),
+        ).pack(side="left", padx=(0, 10))
         ctk.CTkButton(
-            row, text=T.with_shortcut("Save", "F11"), command=lambda: self.save(print_rcpt=False), **T.button_kwargs(),
-        ).pack(side="left", fill="x", expand=True, padx=(0, 6))
+            inner,
+            text=T.with_shortcut("Save", "F11"),
+            command=lambda: self.save(print_rcpt=False),
+            **T.button_kwargs(width=120, height=42),
+        ).pack(side="left", padx=(0, 10))
         ctk.CTkButton(
-            row, text=T.with_shortcut("Clear", "F9"), command=self.clear_form, **T.button_kwargs(),
-        ).pack(side="left", fill="x", expand=True)
+            inner,
+            text=T.with_shortcut("Clear", "F9"),
+            command=self.clear_form,
+            **T.button_kwargs(width=120, height=42),
+        ).pack(side="left")
 
     def _tax_caption(self):
         return f"Tax ({int(self.tax_rate * 100)}%)"
@@ -411,7 +429,10 @@ class InvoiceTab(ctk.CTkFrame):
             if print_rcpt:
                 from datetime import datetime
                 invoice.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                msg += " · Printed" if print_receipt(invoice, self.items) else " · Print failed"
+                printed, print_msg = print_receipt(invoice, self.items)
+                msg += " · Printed" if printed else " · Print failed"
+                if not printed:
+                    messagebox.showerror("Print failed", print_msg)
             self.winfo_toplevel().set_status(msg)
             self.clear_form()
             app = self.winfo_toplevel()

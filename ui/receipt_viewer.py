@@ -49,10 +49,11 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem]):
 
     def do_print():
         from printer import print_receipt
-        if print_receipt(invoice, items):
+        ok, msg = print_receipt(invoice, items)
+        if ok:
             parent.set_status(f"Printed {invoice.invoice_number}")
         else:
-            messagebox.showerror("Print failed", "Check printer settings and try again.")
+            messagebox.showerror("Print failed", msg)
 
     def do_email():
         from email_service import send_receipt_email
