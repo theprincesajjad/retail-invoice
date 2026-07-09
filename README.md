@@ -63,7 +63,7 @@ python main.py
 
 Go to **[Releases](https://github.com/theprincesajjad/retail-invoice/releases)** and download the latest `RetailInvoice-x.x.x-Windows.exe`. Double-click to run — no install or extra folders needed.
 
-Current version: **1.0.1**
+Current version: **1.0.2**
 
 ## Building Windows .exe locally
 

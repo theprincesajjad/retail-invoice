@@ -44,55 +44,73 @@ def entry_kwargs(width=200):
     )
 
 
+def _merge_kwargs(defaults, **extra):
+    merged = dict(defaults)
+    merged.update(extra)
+    return merged
+
+
 def label_kwargs(**extra):
-    return dict(text_color=TEXT, font=FONT, **extra)
+    return _merge_kwargs({"text_color": TEXT, "font": FONT}, **extra)
 
 
-def header_label_kwargs(width=100):
-    return dict(
-        width=width,
-        anchor="w",
-        font=FONT_HEADER,
-        text_color=HEADER_TEXT,
-        fg_color=HEADER_BG,
+def header_label_kwargs(width=100, **extra):
+    return _merge_kwargs(
+        {
+            "width": width,
+            "anchor": "w",
+            "font": FONT_HEADER,
+            "text_color": HEADER_TEXT,
+            "fg_color": HEADER_BG,
+        },
+        **extra,
     )
 
 
 def button_kwargs(**extra):
-    return dict(
-        fg_color=BTN_BG,
-        hover_color=BTN_HOVER,
-        text_color=BTN_TEXT,
-        corner_radius=0,
-        font=FONT,
+    return _merge_kwargs(
+        {
+            "fg_color": BTN_BG,
+            "hover_color": BTN_HOVER,
+            "text_color": BTN_TEXT,
+            "corner_radius": 0,
+            "font": FONT,
+        },
         **extra,
     )
 
 
 def primary_button_kwargs(**extra):
-    return dict(
-        fg_color=BTN_PRIMARY_BG,
-        hover_color=BTN_PRIMARY_HOVER,
-        text_color=BTN_PRIMARY_TEXT,
-        corner_radius=0,
-        font=FONT_BOLD,
+    return _merge_kwargs(
+        {
+            "fg_color": BTN_PRIMARY_BG,
+            "hover_color": BTN_PRIMARY_HOVER,
+            "text_color": BTN_PRIMARY_TEXT,
+            "corner_radius": 0,
+            "font": FONT_BOLD,
+        },
         **extra,
     )
 
 
 def danger_button_kwargs(**extra):
-    return dict(
-        fg_color=BTN_DANGER_BG,
-        hover_color=BTN_DANGER_HOVER,
-        text_color=BTN_DANGER_TEXT,
-        corner_radius=0,
-        font=FONT,
+    return _merge_kwargs(
+        {
+            "fg_color": BTN_DANGER_BG,
+            "hover_color": BTN_DANGER_HOVER,
+            "text_color": BTN_DANGER_TEXT,
+            "corner_radius": 0,
+            "font": FONT,
+        },
         **extra,
     )
 
 
 def panel_kwargs(**extra):
-    return dict(fg_color=BG_PANEL, corner_radius=0, border_width=1, border_color=BORDER, **extra)
+    return _merge_kwargs(
+        {"fg_color": BG_PANEL, "corner_radius": 0, "border_width": 1, "border_color": BORDER},
+        **extra,
+    )
 
 
 def combo_kwargs(width=160):
