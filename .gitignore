@@ -11,6 +11,8 @@ env/
 # Build artifacts
 build/
 dist/
+release/
+RetailInvoice-Windows.zip
 *.spec.bak
 
 # Database (local user data)

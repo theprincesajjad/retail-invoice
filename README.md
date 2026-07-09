@@ -55,7 +55,13 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## Building Windows .exe
+## Download (Windows)
+
+Go to **[Releases](https://github.com/theprincesajjad/retail-invoice/releases)** and download the latest `RetailInvoice-x.x.x-Windows.exe`. Double-click to run — no install or extra folders needed.
+
+Current version: **1.0.0**
+
+## Building Windows .exe locally
 
 On a Windows PC, run:
 
@@ -63,9 +69,20 @@ On a Windows PC, run:
 build.bat
 ```
 
-The executable will be in `dist\RetailInvoice\RetailInvoice.exe`.
+The single-file executable will be at `dist\RetailInvoice.exe`.
 
-Or download the latest build from GitHub Actions artifacts (Actions → Build Windows EXE → Artifacts).
+## Releasing a new version
+
+1. Update `VERSION` (e.g. `1.1.0`)
+2. Commit the change
+3. Tag and push:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+GitHub Actions will build the `.exe` and publish a new release automatically.
 
 ## Requirements
 

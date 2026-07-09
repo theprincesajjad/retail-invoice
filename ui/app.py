@@ -1,8 +1,22 @@
+import sys
 import customtkinter as ctk
+from pathlib import Path
 from .invoice_tab import InvoiceTab
 from .inventory_tab import InventoryTab
 from .reports_tab import ReportsTab
 from .settings_tab import SettingsTab
+
+
+def get_app_version() -> str:
+    if getattr(sys, "frozen", False):
+        base = Path(sys._MEIPASS)
+    else:
+        base = Path(__file__).resolve().parent.parent
+    version_file = base / "VERSION"
+    try:
+        return version_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        return "1.0.0"
 
 TAB_INVOICE = "New Invoice (F1)"
 TAB_INVENTORY = "Inventory (F2)"
@@ -14,7 +28,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Retail Invoice System (DOS Mode)")
+        self.title(f"Retail Invoice System v{get_app_version()} (DOS Mode)")
         self.geometry("1100x700")
         self.minsize(900, 600)
 

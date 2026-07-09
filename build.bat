@@ -19,18 +19,25 @@ call venv\Scripts\activate.bat
 echo Installing Dependencies...
 pip install -r requirements.txt
 
-echo Building Executable with PyInstaller...
-pyinstaller --name "RetailInvoice" --windowed --noconfirm --clean ^
+echo Installing PyInstaller...
+pip install pyinstaller
+
+echo Building single-file Executable with PyInstaller...
+pyinstaller --name "RetailInvoice" --onefile --windowed --noconfirm --clean ^
     --add-data "assets;assets" ^
-    --add-data "ui;ui" ^
+    --add-data "VERSION;." ^
+    --collect-all customtkinter ^
     --hidden-import customtkinter ^
     --hidden-import pywin32 ^
     --hidden-import PIL ^
     --hidden-import escpos ^
+    --hidden-import win32print ^
+    --hidden-import win32api ^
     main.py
 
 echo ==============================================
 echo Build Complete!
-echo You can find your compiled .exe in the 'dist/RetailInvoice' folder.
+echo You can find your compiled .exe in the 'dist' folder:
+echo   dist\RetailInvoice.exe
 echo ==============================================
 pause
