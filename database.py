@@ -69,6 +69,21 @@ def init_db():
                 cursor.execute('INSERT INTO settings (key, value) VALUES (?, ?)', (key, value))
         
         conn.commit()
+        _migrate_schema(conn)
+
+
+def _migrate_schema(conn):
+    cursor = conn.cursor()
+    for sql in (
+        "ALTER TABLE invoices ADD COLUMN discount_type TEXT DEFAULT ''",
+        "ALTER TABLE invoices ADD COLUMN discount_value REAL DEFAULT 0",
+        "ALTER TABLE invoices ADD COLUMN discount_amount REAL DEFAULT 0",
+    ):
+        try:
+            cursor.execute(sql)
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
 def get_setting(key, default=""):
     with get_db_connection() as conn:
@@ -149,13 +164,18 @@ def generate_invoice_number():
 def save_invoice(invoice: Invoice, items: list[InvoiceItem]):
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        
-        # Save invoice header
+
         cursor.execute('''
-            INSERT INTO invoices (invoice_number, customer_name, customer_phone, subtotal, tax_rate, tax_amount, total, payment_method, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (invoice.invoice_number, invoice.customer_name, invoice.customer_phone, invoice.subtotal, 
-              invoice.tax_rate, invoice.tax_amount, invoice.total, invoice.payment_method, invoice.notes))
+            INSERT INTO invoices (
+                invoice_number, customer_name, customer_phone, subtotal, tax_rate, tax_amount, total,
+                payment_method, notes, discount_type, discount_value, discount_amount
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            invoice.invoice_number, invoice.customer_name, invoice.customer_phone, invoice.subtotal,
+            invoice.tax_rate, invoice.tax_amount, invoice.total, invoice.payment_method, invoice.notes,
+            invoice.discount_type or "", invoice.discount_value or 0.0, invoice.discount_amount or 0.0,
+        ))
         
         invoice_id = cursor.lastrowid
         
@@ -173,21 +193,47 @@ def save_invoice(invoice: Invoice, items: list[InvoiceItem]):
         conn.commit()
         return invoice_id
 
-def get_invoices(start_date=None, end_date=None):
+def get_invoices(start_date=None, end_date=None, search_query=""):
+    return _fetch_invoices(start_date, end_date, search_query)
+
+
+def search_invoices(search_query="", start_date=None, end_date=None):
+    return _fetch_invoices(start_date, end_date, search_query)
+
+
+def _fetch_invoices(start_date=None, end_date=None, search_query=""):
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        query = 'SELECT * FROM invoices'
+        query = "SELECT DISTINCT i.* FROM invoices i"
         params = []
+        conditions = []
+
+        if search_query.strip():
+            query += " LEFT JOIN invoice_items ii ON ii.invoice_id = i.id"
+            like = f"%{search_query.strip()}%"
+            conditions.append(
+                "(i.customer_name LIKE ? OR i.customer_phone LIKE ? OR ii.description LIKE ? OR ii.serial_number LIKE ?)"
+            )
+            params.extend([like, like, like, like])
+
         if start_date and end_date:
-            query += ' WHERE created_at >= ? AND created_at <= ?'
+            conditions.append("i.created_at >= ? AND i.created_at <= ?")
             params.extend([start_date, end_date])
-        query += ' ORDER BY created_at DESC'
-        
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY i.created_at DESC"
+
         cursor.execute(query, params)
         rows = cursor.fetchall()
         invoices = []
         for row in rows:
-            inv = Invoice(**dict(row), items=[])
+            data = dict(row)
+            data.setdefault("discount_type", "")
+            data.setdefault("discount_value", 0.0)
+            data.setdefault("discount_amount", 0.0)
+            inv = Invoice(**data, items=[])
             cursor.execute('SELECT * FROM invoice_items WHERE invoice_id = ?', (inv.id,))
             item_rows = cursor.fetchall()
             inv.items = [InvoiceItem(**dict(i)) for i in item_rows]

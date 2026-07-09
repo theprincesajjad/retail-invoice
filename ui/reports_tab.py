@@ -1,99 +1,109 @@
 import customtkinter as ctk
-from database import get_invoices
-from models import Invoice
+from database import search_invoices
 from utils import format_currency
 from datetime import datetime, timedelta
 import calendar
 from . import theme as T
 
+
 class ReportsTab(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master, fg_color=T.BG, corner_radius=0)
-        
+
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        
+
         self.create_filters()
         self.create_summary()
         self.create_table()
-        
-        # Load current month by default
+
         self.period_var.set("Monthly")
         self.on_filter_change()
 
     def create_filters(self):
-        frame = ctk.CTkFrame(self, **T.panel_kwargs())
-        frame.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
-        
-        ctk.CTkLabel(frame, text="Period (Alt+P):", **T.label_kwargs(text_color=T.LABEL_ACCENT)).pack(side="left", padx=8)
+        card = ctk.CTkFrame(self, **T.card_kwargs())
+        card.grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 8))
+
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="x", padx=20, pady=14)
+
+        ctk.CTkLabel(inner, text="Period", **T.label_secondary()).pack(side="left", padx=(0, 8))
         self.period_var = ctk.StringVar(value="Monthly")
-        self.period_combo = ctk.CTkComboBox(frame, variable=self.period_var, values=["Monthly", "Quarterly", "Yearly"], command=self.on_filter_change, **T.combo_kwargs(140))
-        self.period_combo.pack(side="left", padx=5)
-        
-        ctk.CTkLabel(frame, text="Date Range:", **T.label_kwargs()).pack(side="left", padx=(20, 5))
+        self.period_combo = ctk.CTkComboBox(
+            inner, variable=self.period_var, values=["Monthly", "Quarterly", "Yearly"],
+            command=self.on_filter_change, **T.combo_kwargs(130),
+        )
+        self.period_combo.pack(side="left", padx=(0, 16))
+
+        ctk.CTkLabel(inner, text="Range", **T.label_secondary()).pack(side="left", padx=(0, 8))
         self.range_var = ctk.StringVar()
-        self.range_combo = ctk.CTkComboBox(frame, variable=self.range_var, values=[], command=self.load_invoices, **T.combo_kwargs(140))
-        self.range_combo.pack(side="left", padx=5)
-        
-        ctk.CTkButton(frame, text="Refresh (Alt+R)", command=self.load_invoices, **T.button_kwargs()).pack(side="left", padx=20)
+        self.range_combo = ctk.CTkComboBox(
+            inner, variable=self.range_var, values=[], command=self.load_invoices, **T.combo_kwargs(130),
+        )
+        self.range_combo.pack(side="left", padx=(0, 24))
+
+        ctk.CTkLabel(inner, text="Search", **T.label_secondary()).pack(side="left", padx=(0, 8))
+        self.search_var = ctk.StringVar()
+        self.search_entry = ctk.CTkEntry(
+            inner, textvariable=self.search_var,
+            placeholder_text="Name, phone, or product…", **T.entry_kwargs(220),
+        )
+        self.search_entry.pack(side="left", padx=(0, 8))
+        self.search_entry.bind("<KeyRelease>", lambda e: self.load_invoices())
+
+        ctk.CTkButton(inner, text="Refresh", command=self.load_invoices, **T.button_kwargs(width=80)).pack(side="left")
 
     def create_summary(self):
-        self.summary_frame = ctk.CTkFrame(self, **T.panel_kwargs())
-        self.summary_frame.grid(row=1, column=0, sticky="ew", padx=8, pady=5)
-        
+        self.summary_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.summary_frame.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
+
         self.total_sales_var = ctk.StringVar(value="$0.00")
         self.total_tax_var = ctk.StringVar(value="$0.00")
         self.invoice_count_var = ctk.StringVar(value="0")
         self.avg_invoice_var = ctk.StringVar(value="$0.00")
-        
-        boxes = [
-            ("Total Sales", self.total_sales_var),
-            ("Total Tax", self.total_tax_var),
-            ("Invoice Count", self.invoice_count_var),
-            ("Avg Invoice", self.avg_invoice_var)
-        ]
-        
-        for i, (title, var) in enumerate(boxes):
-            box = ctk.CTkFrame(self.summary_frame, fg_color=T.INPUT_BG, corner_radius=0)
-            box.grid(row=0, column=i, padx=10, pady=10, sticky="ew")
+
+        for i, (title, var) in enumerate([
+            ("Total sales", self.total_sales_var),
+            ("Total tax", self.total_tax_var),
+            ("Invoices", self.invoice_count_var),
+            ("Average", self.avg_invoice_var),
+        ]):
+            box = ctk.CTkFrame(self.summary_frame, **T.card_kwargs())
+            box.grid(row=0, column=i, padx=(0 if i == 0 else 6, 0), sticky="ew")
             self.summary_frame.grid_columnconfigure(i, weight=1)
-            
-            ctk.CTkLabel(box, text=title, font=T.FONT, text_color=T.INPUT_TEXT).pack(pady=(10, 0))
-            ctk.CTkLabel(box, textvariable=var, font=T.FONT_TOTAL, text_color=T.LABEL_ACCENT).pack(pady=(0, 10))
+            ctk.CTkLabel(box, text=title, **T.label_secondary()).pack(padx=16, pady=(14, 0), anchor="w")
+            ctk.CTkLabel(box, textvariable=var, font=T.FONT_HEADLINE, text_color=T.TEXT).pack(padx=16, pady=(4, 14), anchor="w")
 
     def create_table(self):
-        self.table_frame = ctk.CTkScrollableFrame(self, fg_color=T.BG, corner_radius=0)
-        self.table_frame.grid(row=2, column=0, sticky="nsew", padx=8, pady=5)
-        
-        self.headers = ["Invoice #", "Date", "Customer", "Subtotal", "Tax", "Total", "Payment", "Action"]
-        self.widths = [120, 150, 150, 80, 80, 100, 100, 100]
-        
-        header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.HEADER_BG, corner_radius=0)
-        header_frame.pack(fill="x", pady=(0, 5))
-        
+        card = ctk.CTkFrame(self, **T.card_kwargs())
+        card.grid(row=2, column=0, sticky="nsew", padx=4, pady=(0, 4))
+        card.grid_rowconfigure(0, weight=1)
+        card.grid_columnconfigure(0, weight=1)
+
+        self.table_frame = ctk.CTkScrollableFrame(card, fg_color=T.SURFACE, corner_radius=0)
+        self.table_frame.grid(row=0, column=0, sticky="nsew")
+
+        self.headers = ["Invoice", "Date", "Customer", "Phone", "Subtotal", "Discount", "Tax", "Total", "Pay", ""]
+        self.widths = [110, 130, 130, 110, 80, 72, 72, 88, 56, 72]
+
+        header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.SURFACE_ALT, corner_radius=0)
+        header_frame.pack(fill="x", padx=12, pady=(12, 4))
         for text, width in zip(self.headers, self.widths):
-            ctk.CTkLabel(header_frame, text=text, width=width, anchor="w", font=T.FONT_HEADER, text_color=T.HEADER_TEXT).pack(side="left", padx=5, pady=3)
-            
+            ctk.CTkLabel(header_frame, text=text, width=width, **T.table_header_kwargs()).pack(side="left", padx=4, pady=8)
+
         self.rows_frame = ctk.CTkFrame(self.table_frame, fg_color="transparent")
-        self.rows_frame.pack(fill="both", expand=True)
+        self.rows_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
     def on_filter_change(self, *args):
         period = self.period_var.get()
         now = datetime.now()
         year = now.year
-        
-        values = []
         if period == "Monthly":
-            # Show last 12 months
-            for i in range(12):
-                d = now - timedelta(days=30*i)
-                values.append(d.strftime("%b %Y"))
+            values = [(now - timedelta(days=30 * i)).strftime("%b %Y") for i in range(12)]
         elif period == "Quarterly":
-            values = [f"Q1 {year}", f"Q2 {year}", f"Q3 {year}", f"Q4 {year}", 
-                      f"Q1 {year-1}", f"Q2 {year-1}", f"Q3 {year-1}", f"Q4 {year-1}"]
-        elif period == "Yearly":
-            values = [str(year), str(year-1), str(year-2)]
-            
+            values = [f"Q{q} {year}" for q in range(1, 5)] + [f"Q{q} {year - 1}" for q in range(1, 5)]
+        else:
+            values = [str(year - i) for i in range(3)]
         self.range_combo.configure(values=values)
         self.range_var.set(values[0])
         self.load_invoices()
@@ -101,84 +111,71 @@ class ReportsTab(ctk.CTkFrame):
     def get_date_range(self):
         period = self.period_var.get()
         rng = self.range_var.get()
-        
-        start_date = None
-        end_date = None
-        
+        start_date = end_date = None
         try:
             if period == "Monthly":
                 dt = datetime.strptime(rng, "%b %Y")
                 start_date = dt.strftime("%Y-%m-01 00:00:00")
                 _, last_day = calendar.monthrange(dt.year, dt.month)
                 end_date = dt.strftime(f"%Y-%m-{last_day} 23:59:59")
-                
             elif period == "Quarterly":
                 q, y = rng.split()
                 y = int(y)
-                if q == "Q1": start_month, end_month = 1, 3
-                elif q == "Q2": start_month, end_month = 4, 6
-                elif q == "Q3": start_month, end_month = 7, 9
-                else: start_month, end_month = 10, 12
-                
-                start_date = f"{y}-{start_month:02d}-01 00:00:00"
-                _, last_day = calendar.monthrange(y, end_month)
-                end_date = f"{y}-{end_month:02d}-{last_day} 23:59:59"
-                
+                sm, em = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}[int(q[1])]
+                start_date = f"{y}-{sm:02d}-01 00:00:00"
+                _, ld = calendar.monthrange(y, em)
+                end_date = f"{y}-{em:02d}-{ld} 23:59:59"
             elif period == "Yearly":
                 start_date = f"{rng}-01-01 00:00:00"
                 end_date = f"{rng}-12-31 23:59:59"
         except Exception:
             pass
-            
         return start_date, end_date
 
     def load_invoices(self, *args):
         for widget in self.rows_frame.winfo_children():
             widget.destroy()
-            
+
         start_date, end_date = self.get_date_range()
-        invoices = get_invoices(start_date, end_date)
-        
+        query = self.search_var.get().strip()
+        invoices = search_invoices(query, start_date, end_date)
+
         total_sales = sum(inv.total for inv in invoices)
         total_tax = sum(inv.tax_amount for inv in invoices)
         count = len(invoices)
-        avg = total_sales / count if count > 0 else 0
-        
+        avg = total_sales / count if count else 0
+
         self.total_sales_var.set(format_currency(total_sales))
         self.total_tax_var.set(format_currency(total_tax))
         self.invoice_count_var.set(str(count))
         self.avg_invoice_var.set(format_currency(avg))
-        
-        for inv in invoices:
-            row = ctk.CTkFrame(self.rows_frame, fg_color="transparent")
-            row.pack(fill="x", pady=2)
-            
-            # Formatting date
+
+        for i, inv in enumerate(invoices):
+            row = ctk.CTkFrame(self.rows_frame, fg_color=T.SURFACE_ALT if i % 2 == 0 else "transparent", corner_radius=T.RADIUS_SM)
+            row.pack(fill="x", pady=1)
+
             date_str = inv.created_at[:16] if inv.created_at else ""
-            
-            ctk.CTkLabel(row, text=inv.invoice_number, width=self.widths[0], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=date_str, width=self.widths[1], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=inv.customer_name or "-", width=self.widths[2], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=format_currency(inv.subtotal), width=self.widths[3], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=format_currency(inv.tax_amount), width=self.widths[4], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=format_currency(inv.total), width=self.widths[5], anchor="w", font=T.FONT_BOLD, text_color=T.LABEL_ACCENT).pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=inv.payment_method, width=self.widths[6], anchor="w", **T.label_kwargs()).pack(side="left", padx=5)
-            
-            # Action column
-            actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[7])
-            actions.pack(side="left", padx=5)
-            
-            def make_reprint_cmd(invoice_obj):
-                return lambda: self.reprint_invoice(invoice_obj)
-                
-            ctk.CTkButton(actions, text="Reprint", width=80, command=make_reprint_cmd(inv), **T.button_kwargs()).pack(side="left")
+            disc = format_currency(inv.discount_amount) if inv.discount_amount else "—"
+            cells = [
+                inv.invoice_number, date_str, inv.customer_name or "—", inv.customer_phone or "—",
+                format_currency(inv.subtotal), disc, format_currency(inv.tax_amount),
+                format_currency(inv.total), inv.payment_method,
+            ]
+            for text, width in zip(cells, self.widths[:-1]):
+                ctk.CTkLabel(row, text=text, width=width, anchor="w", font=T.FONT, text_color=T.TEXT).pack(side="left", padx=4, pady=8)
+
+            actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[-1])
+            actions.pack(side="left", padx=4)
+            ctk.CTkButton(
+                actions, text="Print", width=64, height=30,
+                command=lambda inv_obj=inv: self.reprint_invoice(inv_obj),
+                **T.button_kwargs(height=30),
+            ).pack(side="left")
 
     def reprint_invoice(self, invoice):
         from printer import print_receipt
         from tkinter import messagebox
         if print_receipt(invoice, invoice.items):
             self.winfo_toplevel().set_status(f"Reprinted {invoice.invoice_number}")
-            messagebox.showinfo("Success", f"Reprinted {invoice.invoice_number}")
         else:
-            self.winfo_toplevel().set_status("Reprint failed.")
-            messagebox.showerror("Error", "Printing failed. Check settings and printer connection.")
+            messagebox.showerror("Print failed", "Check printer settings and try again.")

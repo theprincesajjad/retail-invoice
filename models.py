@@ -39,3 +39,6 @@ class Invoice:
     notes: str
     created_at: str
     items: list[InvoiceItem]
+    discount_type: str = ""       # "percent" or "fixed"
+    discount_value: float = 0.0
+    discount_amount: float = 0.0

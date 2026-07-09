@@ -3,7 +3,7 @@ from tkinter import messagebox
 from database import search_products, generate_invoice_number, save_invoice, get_setting
 from models import Invoice, InvoiceItem
 from printer import print_receipt
-from utils import format_currency
+from utils import format_currency, compute_invoice_totals
 from . import theme as T
 
 
@@ -15,193 +15,214 @@ class InvoiceTab(ctk.CTkFrame):
 
         self.items = []
         self.tax_rate = float(get_setting("tax_rate", "0.13"))
-        self.payment_radios = {}
+        self.discount_type = ctk.StringVar(value="percent")
+        self._tax_caption_prefix = "Tax"
 
-        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0, minsize=320)
+        self.grid_rowconfigure(1, weight=1)
 
-        self.create_items_list_section()
-        self.create_customer_section()
-        self.create_item_entry_section()
-        self.create_bottom_section()
-
+        self._build_customer_row()
+        self._build_main_area()
+        self._build_sidebar()
         self._bind_manual_enter_keys()
 
-    def create_items_list_section(self):
-        panel = ctk.CTkFrame(self, **T.panel_kwargs())
-        panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=(8, 4))
+    def focus_customer(self):
+        self.customer_name_entry.focus_set()
 
-        self.items_frame = ctk.CTkScrollableFrame(panel, fg_color=T.BG, corner_radius=0)
-        self.items_frame.pack(fill="both", expand=True, padx=4, pady=4)
+    def focus_manual_desc(self):
+        self.man_desc.focus_set()
 
-        headers = ["Line", "Qty", "Description", "S/N", "Price", "Amount", ""]
-        widths = [40, 45, 260, 130, 90, 100, 50]
+    def focus_discount(self):
+        self.discount_entry.focus_set()
 
-        header_frame = ctk.CTkFrame(self.items_frame, fg_color=T.HEADER_BG, corner_radius=0)
-        header_frame.pack(fill="x", pady=(0, 4))
+    def _build_customer_row(self):
+        card = ctk.CTkFrame(self, **T.card_kwargs())
+        card.grid(row=0, column=0, columnspan=2, sticky="ew", padx=4, pady=(4, 8))
 
-        for text, width in zip(headers, widths):
-            ctk.CTkLabel(header_frame, text=text, width=width, anchor="w", font=T.FONT_HEADER, text_color=T.HEADER_TEXT).pack(
-                side="left", padx=4, pady=3
-            )
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="x", padx=20, pady=16)
 
-        self.item_rows_frame = ctk.CTkFrame(self.items_frame, fg_color="transparent")
-        self.item_rows_frame.pack(fill="both", expand=True)
+        T.section_title(inner, "Customer").pack(anchor="w", pady=(0, 12))
 
-    def create_customer_section(self):
-        frame = ctk.CTkFrame(self, **T.panel_kwargs())
-        frame.grid(row=1, column=0, sticky="ew", padx=8, pady=4)
+        fields = ctk.CTkFrame(inner, fg_color="transparent")
+        fields.pack(fill="x")
 
-        ctk.CTkLabel(frame, text="Customer (Alt+C):", **T.label_kwargs(text_color=T.LABEL_ACCENT)).pack(side="left", padx=8, pady=6)
-        self.customer_name_entry = ctk.CTkEntry(frame, **T.entry_kwargs(220))
-        self.customer_name_entry.pack(side="left", padx=4, pady=6)
+        name_col = ctk.CTkFrame(fields, fg_color="transparent")
+        name_col.pack(side="left", fill="x", expand=True, padx=(0, 12))
+        ctk.CTkLabel(name_col, text="Name", **T.label_secondary()).pack(anchor="w")
+        self.customer_name_entry = ctk.CTkEntry(name_col, placeholder_text="Customer name", **T.entry_kwargs())
+        self.customer_name_entry.pack(fill="x", pady=(4, 0))
 
-        ctk.CTkLabel(frame, text="Phone (Alt+P):", **T.label_kwargs(text_color=T.LABEL_ACCENT)).pack(side="left", padx=(16, 4), pady=6)
-        self.customer_phone_entry = ctk.CTkEntry(frame, **T.entry_kwargs(150))
-        self.customer_phone_entry.pack(side="left", padx=4, pady=6)
+        phone_col = ctk.CTkFrame(fields, fg_color="transparent")
+        phone_col.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(phone_col, text="Phone", **T.label_secondary()).pack(anchor="w")
+        self.customer_phone_entry = ctk.CTkEntry(phone_col, placeholder_text="(416) 555-0100", **T.entry_kwargs())
+        self.customer_phone_entry.pack(fill="x", pady=(4, 0))
 
-    def create_item_entry_section(self):
-        frame = ctk.CTkFrame(self, **T.panel_kwargs())
-        frame.grid(row=2, column=0, sticky="ew", padx=8, pady=4)
+    def _build_main_area(self):
+        left = ctk.CTkFrame(self, fg_color="transparent")
+        left.grid(row=1, column=0, sticky="nsew", padx=(4, 8), pady=4)
+        left.grid_rowconfigure(1, weight=1)
+        left.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(frame, text="Stock Search (Alt+S):", **T.label_kwargs(text_color=T.LABEL_ACCENT)).pack(side="left", padx=8, pady=6)
+        add_card = ctk.CTkFrame(left, **T.card_kwargs())
+        add_card.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        add_inner = ctk.CTkFrame(add_card, fg_color="transparent")
+        add_inner.pack(fill="x", padx=20, pady=16)
+
+        ctk.CTkLabel(add_inner, text="Add items", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(anchor="w", pady=(0, 10))
+
+        row1 = ctk.CTkFrame(add_inner, fg_color="transparent")
+        row1.pack(fill="x", pady=(0, 8))
         self.search_var = ctk.StringVar()
-        self.search_entry = ctk.CTkEntry(frame, textvariable=self.search_var, placeholder_text="Name or Serial", **T.entry_kwargs(180))
-        self.search_entry.pack(side="left", padx=4, pady=6)
+        self.search_entry = ctk.CTkEntry(row1, textvariable=self.search_var, placeholder_text="Search inventory…", **T.entry_kwargs())
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self.search_entry.bind("<KeyRelease>", self.on_search)
-
-        self.search_results = ctk.CTkComboBox(frame, values=[], **T.combo_kwargs(260))
-        self.search_results.pack(side="left", padx=4, pady=6)
-
-        ctk.CTkButton(frame, text="Add Stock", command=self.add_inventory_item, width=90, **T.button_kwargs()).pack(
-            side="left", padx=8, pady=6
-        )
-
+        self.search_results = ctk.CTkComboBox(row1, values=[], **T.combo_kwargs(240))
+        self.search_results.pack(side="left", padx=(0, 8))
+        ctk.CTkButton(row1, text="Add", width=72, command=self.add_inventory_item, **T.primary_button_kwargs(height=36)).pack(side="left")
         self.current_search_products = []
 
-    def create_bottom_section(self):
-        bottom = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
-        bottom.grid(row=3, column=0, sticky="ew", padx=8, pady=(4, 8))
-        bottom.grid_columnconfigure(0, weight=3)
-        bottom.grid_columnconfigure(1, weight=2)
-
-        manual_panel = ctk.CTkFrame(bottom, **T.panel_kwargs())
-        manual_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-
-        enter_hdr = ctk.CTkFrame(manual_panel, fg_color=T.INPUT_BG, corner_radius=0)
-        enter_hdr.pack(fill="x", padx=6, pady=(6, 0))
-        ctk.CTkLabel(enter_hdr, text="Enter", font=T.FONT_BOLD, text_color=T.INPUT_TEXT).pack(padx=8, pady=4, anchor="w")
-
-        fields = ctk.CTkFrame(manual_panel, fg_color="transparent")
-        fields.pack(fill="x", padx=6, pady=6)
-
-        ctk.CTkLabel(fields, text="Description (Alt+M):", **T.label_kwargs(text_color=T.LABEL_ACCENT)).grid(row=0, column=0, sticky="w", pady=4)
-        self.man_desc = ctk.CTkEntry(fields, placeholder_text="Item description", **T.entry_kwargs(220))
-        self.man_desc.grid(row=0, column=1, sticky="w", padx=8, pady=4)
-
-        ctk.CTkLabel(fields, text="Quantity:", **T.label_kwargs()).grid(row=1, column=0, sticky="w", pady=4)
-        self.man_qty = ctk.CTkEntry(fields, **T.entry_kwargs(80))
+        row2 = ctk.CTkFrame(add_inner, fg_color="transparent")
+        row2.pack(fill="x")
+        ctk.CTkLabel(row2, text="Manual entry", **T.label_secondary()).pack(side="left", padx=(0, 12))
+        self.man_desc = ctk.CTkEntry(row2, placeholder_text="Description", **T.entry_kwargs(180))
+        self.man_desc.pack(side="left", padx=(0, 6))
+        self.man_qty = ctk.CTkEntry(row2, placeholder_text="Qty", width=64, height=36, fg_color=T.SURFACE_ALT, border_color=T.BORDER, corner_radius=T.RADIUS_SM)
         self.man_qty.insert(0, "1")
-        self.man_qty.grid(row=1, column=1, sticky="w", padx=8, pady=4)
+        self.man_qty.pack(side="left", padx=(0, 6))
+        self.man_price = ctk.CTkEntry(row2, placeholder_text="Price", width=88, height=36, fg_color=T.SURFACE_ALT, border_color=T.BORDER, corner_radius=T.RADIUS_SM)
+        self.man_price.pack(side="left", padx=(0, 8))
+        ctk.CTkButton(row2, text="Add line", width=88, command=self.add_manual_item, **T.button_kwargs()).pack(side="left")
 
-        ctk.CTkLabel(fields, text="Price:", **T.label_kwargs()).grid(row=2, column=0, sticky="w", pady=4)
-        self.man_price = ctk.CTkEntry(fields, placeholder_text="0.00", **T.entry_kwargs(100))
-        self.man_price.grid(row=2, column=1, sticky="w", padx=8, pady=4)
+        lines_card = ctk.CTkFrame(left, **T.card_kwargs())
+        lines_card.grid(row=1, column=0, sticky="nsew")
+        lines_inner = ctk.CTkFrame(lines_card, fg_color="transparent")
+        lines_inner.pack(fill="both", expand=True, padx=20, pady=16)
+        lines_inner.grid_rowconfigure(1, weight=1)
+        lines_inner.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkButton(
-            fields,
-            text="Add Line (Enter / Alt+A)",
-            command=self.add_manual_item,
-            width=180,
-            **T.primary_button_kwargs(),
-        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 4))
+        ctk.CTkLabel(lines_inner, text="Line items", font=T.FONT_MEDIUM, text_color=T.TEXT).grid(row=0, column=0, sticky="w", pady=(0, 8))
 
-        right_panel = ctk.CTkFrame(bottom, **T.panel_kwargs())
-        right_panel.grid(row=0, column=1, sticky="nsew")
+        self.items_scroll = ctk.CTkScrollableFrame(lines_inner, fg_color=T.SURFACE_ALT, corner_radius=T.RADIUS_SM)
+        self.items_scroll.grid(row=1, column=0, sticky="nsew")
 
-        totals_frame = ctk.CTkFrame(right_panel, fg_color="transparent")
-        totals_frame.pack(fill="x", padx=12, pady=(12, 6))
+        hdr = ctk.CTkFrame(self.items_scroll, fg_color="transparent")
+        hdr.pack(fill="x", padx=8, pady=(8, 4))
+        for text, w in [("#", 28), ("Description", 200), ("S/N", 100), ("Qty", 40), ("Price", 72), ("Amount", 80)]:
+            ctk.CTkLabel(hdr, text=text, width=w, **T.table_header_kwargs()).pack(side="left", padx=4)
 
-        self.subtotal_label = ctk.CTkLabel(totals_frame, text="Sub Total: $0.00", font=T.FONT_BOLD, text_color=T.TEXT, anchor="e")
-        self.subtotal_label.pack(fill="x", pady=2)
-        tax_pct = int(self.tax_rate * 100)
-        self.tax_label = ctk.CTkLabel(totals_frame, text=f"Tax ({tax_pct}%): $0.00", font=T.FONT_BOLD, text_color=T.TEXT, anchor="e")
-        self.tax_label.pack(fill="x", pady=2)
-        self.total_label = ctk.CTkLabel(totals_frame, text="Total: $0.00", font=T.FONT_TOTAL, text_color=T.LABEL_ACCENT, anchor="e")
-        self.total_label.pack(fill="x", pady=6)
+        self.item_rows_frame = ctk.CTkFrame(self.items_scroll, fg_color="transparent")
+        self.item_rows_frame.pack(fill="both", expand=True, padx=4, pady=(0, 8))
 
-        pay_frame = ctk.CTkFrame(right_panel, fg_color=T.INPUT_BG, corner_radius=0)
-        pay_frame.pack(fill="x", padx=12, pady=6)
-        ctk.CTkLabel(pay_frame, text="Payment (F7):", font=T.FONT_BOLD, text_color=T.INPUT_TEXT).pack(anchor="w", padx=8, pady=(6, 2))
+    def _build_sidebar(self):
+        side = ctk.CTkFrame(self, fg_color="transparent", width=320)
+        side.grid(row=1, column=1, sticky="nsew", padx=(0, 4), pady=4)
 
-        radio_row = ctk.CTkFrame(pay_frame, fg_color="transparent")
-        radio_row.pack(fill="x", padx=8, pady=(0, 8))
+        summary = ctk.CTkFrame(side, **T.card_kwargs())
+        summary.pack(fill="x", pady=(0, 8))
+
+        s_inner = ctk.CTkFrame(summary, fg_color="transparent")
+        s_inner.pack(fill="x", padx=20, pady=20)
+
+        T.section_title(s_inner, "Summary").pack(anchor="w", pady=(0, 16))
+
+        self.subtotal_label = self._summary_row(s_inner, "Subtotal", "$0.00")
+        self.discount_summary_label = self._summary_row(s_inner, "Discount", "−$0.00")
+        self.tax_label = self._summary_row(s_inner, self._tax_caption(), "$0.00")
+
+        ctk.CTkFrame(s_inner, fg_color=T.BORDER, height=1, corner_radius=0).pack(fill="x", pady=12)
+        self.total_label = ctk.CTkLabel(s_inner, text="$0.00", font=T.FONT_LARGE, text_color=T.TEXT, anchor="e")
+        ctk.CTkLabel(s_inner, text="Total", **T.label_secondary()).pack(anchor="w")
+        self.total_label.pack(anchor="e", pady=(0, 4))
+
+        discount_card = ctk.CTkFrame(side, **T.card_kwargs())
+        discount_card.pack(fill="x", pady=(0, 8))
+        d_inner = ctk.CTkFrame(discount_card, fg_color="transparent")
+        d_inner.pack(fill="x", padx=20, pady=16)
+
+        ctk.CTkLabel(d_inner, text="Discount", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(anchor="w", pady=(0, 10))
+
+        type_row = ctk.CTkFrame(d_inner, fg_color="transparent")
+        type_row.pack(fill="x", pady=(0, 8))
+        ctk.CTkRadioButton(
+            type_row, text="%", variable=self.discount_type, value="percent",
+            command=self.refresh_items, font=T.FONT, text_color=T.TEXT,
+            fg_color=T.ACCENT, border_color=T.BORDER,
+        ).pack(side="left", padx=(0, 16))
+        ctk.CTkRadioButton(
+            type_row, text="$", variable=self.discount_type, value="fixed",
+            command=self.refresh_items, font=T.FONT, text_color=T.TEXT,
+            fg_color=T.ACCENT, border_color=T.BORDER,
+        ).pack(side="left")
+
+        self.discount_entry = ctk.CTkEntry(d_inner, placeholder_text="0", **T.entry_kwargs())
+        self.discount_entry.pack(fill="x")
+        self.discount_entry.bind("<KeyRelease>", lambda e: self.refresh_items())
+
+        pay_card = ctk.CTkFrame(side, **T.card_kwargs())
+        pay_card.pack(fill="x", pady=(0, 8))
+        p_inner = ctk.CTkFrame(pay_card, fg_color="transparent")
+        p_inner.pack(fill="x", padx=20, pady=16)
+
+        ctk.CTkLabel(p_inner, text="Payment", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(anchor="w", pady=(0, 10))
         self.payment_var = ctk.StringVar(value="Cash")
-        for i, method in enumerate(self.PAYMENT_METHODS):
-            rb = ctk.CTkRadioButton(
-                radio_row,
-                text=method,
-                variable=self.payment_var,
-                value=method,
-                text_color=T.INPUT_TEXT,
-                fg_color=T.HEADER_BG,
-                hover_color=T.LABEL_ACCENT,
-                border_color=T.BORDER,
-                font=T.FONT,
-            )
-            rb.pack(side="left", padx=8)
-            self.payment_radios[method] = rb
+        pay_row = ctk.CTkFrame(p_inner, fg_color="transparent")
+        pay_row.pack(fill="x")
+        for method in self.PAYMENT_METHODS:
+            ctk.CTkRadioButton(
+                pay_row, text=method, variable=self.payment_var, value=method,
+                font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
+            ).pack(side="left", padx=(0, 12))
 
-        self.payment_status = ctk.CTkLabel(right_panel, text="Payment: Cash", font=T.FONT, text_color=T.LABEL_ACCENT)
-        self.payment_status.pack(anchor="e", padx=12, pady=(0, 4))
+        notes_card = ctk.CTkFrame(side, **T.card_kwargs())
+        notes_card.pack(fill="x", pady=(0, 8))
+        n_inner = ctk.CTkFrame(notes_card, fg_color="transparent")
+        n_inner.pack(fill="x", padx=20, pady=16)
+        ctk.CTkLabel(n_inner, text="Notes", **T.label_secondary()).pack(anchor="w")
+        self.notes_entry = ctk.CTkEntry(n_inner, placeholder_text="Optional", **T.entry_kwargs())
+        self.notes_entry.pack(fill="x", pady=(6, 0))
 
-        ctk.CTkLabel(right_panel, text="Press [F12] to total & print", font=T.FONT_SMALL, text_color=T.TEXT).pack(anchor="e", padx=12)
+        actions = ctk.CTkFrame(side, fg_color="transparent")
+        actions.pack(fill="x")
+        ctk.CTkButton(actions, text="Print & Save", command=lambda: self.save(print_rcpt=True), **T.primary_button_kwargs()).pack(fill="x", pady=(0, 8))
+        row = ctk.CTkFrame(actions, fg_color="transparent")
+        row.pack(fill="x")
+        ctk.CTkButton(row, text="Save", command=lambda: self.save(print_rcpt=False), **T.button_kwargs()).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctk.CTkButton(row, text="Clear", command=self.clear_form, **T.button_kwargs()).pack(side="left", fill="x", expand=True)
 
-        notes_frame = ctk.CTkFrame(right_panel, fg_color="transparent")
-        notes_frame.pack(fill="x", padx=12, pady=6)
-        ctk.CTkLabel(notes_frame, text="Notes:", **T.label_kwargs()).pack(anchor="w")
-        self.notes_entry = ctk.CTkEntry(notes_frame, **T.entry_kwargs(280))
-        self.notes_entry.pack(fill="x", pady=4)
+    def _tax_caption(self):
+        return f"Tax ({int(self.tax_rate * 100)}%)"
 
-        actions = ctk.CTkFrame(right_panel, fg_color="transparent")
-        actions.pack(fill="x", padx=12, pady=(4, 12))
-        ctk.CTkButton(actions, text="Print & Save (F12)", command=lambda: self.save(print_rcpt=True), **T.primary_button_kwargs()).pack(
-            side="left", padx=(0, 6)
-        )
-        ctk.CTkButton(actions, text="Save (F11)", command=lambda: self.save(print_rcpt=False), **T.button_kwargs()).pack(side="left", padx=6)
-        ctk.CTkButton(actions, text="Clear (F9)", command=self.clear_form, **T.danger_button_kwargs()).pack(side="left", padx=6)
+    def _summary_row(self, parent, label, value):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=3)
+        title = ctk.CTkLabel(row, text=label, **T.label_secondary())
+        title.pack(side="left")
+        val = ctk.CTkLabel(row, text=value, font=T.FONT, text_color=T.TEXT, anchor="e")
+        val.pack(side="right")
+        val._title_label = title
+        return val
 
     def _bind_manual_enter_keys(self):
-        self.man_desc.bind("<Return>", self._on_manual_desc_enter)
-        self.man_desc.bind("<KP_Enter>", self._on_manual_desc_enter)
-        self.man_qty.bind("<Return>", self._on_manual_qty_enter)
-        self.man_qty.bind("<KP_Enter>", self._on_manual_qty_enter)
-        self.man_price.bind("<Return>", self._on_manual_price_enter)
-        self.man_price.bind("<KP_Enter>", self._on_manual_price_enter)
+        for widget, nxt in ((self.man_desc, self.man_qty), (self.man_qty, self.man_price)):
+            widget.bind("<Return>", lambda e, n=nxt: (n.focus_set(), "break")[1])
+            widget.bind("<KP_Enter>", lambda e, n=nxt: (n.focus_set(), "break")[1])
+        self.man_price.bind("<Return>", lambda e: (self.add_manual_item(), "break")[1])
+        self.man_price.bind("<KP_Enter>", lambda e: (self.add_manual_item(), "break")[1])
 
-    def _on_manual_desc_enter(self, event=None):
-        self.man_qty.focus_set()
-        return "break"
-
-    def _on_manual_qty_enter(self, event=None):
-        self.man_price.focus_set()
-        return "break"
-
-    def _on_manual_price_enter(self, event=None):
-        self.add_manual_item()
-        return "break"
+    def _get_discount_value(self) -> float:
+        try:
+            return max(0.0, float(self.discount_entry.get().strip() or "0"))
+        except ValueError:
+            return 0.0
 
     def cycle_payment_method(self):
-        current = self.payment_var.get()
-        idx = self.PAYMENT_METHODS.index(current) if current in self.PAYMENT_METHODS else 0
-        next_method = self.PAYMENT_METHODS[(idx + 1) % len(self.PAYMENT_METHODS)]
-        self.payment_var.set(next_method)
-        self._update_payment_status()
-        self.winfo_toplevel().set_status(f"Payment method: {next_method}")
-
-    def _update_payment_status(self):
-        method = self.payment_var.get()
-        self.payment_status.configure(text=f"Payment: {method}")
+        methods = self.PAYMENT_METHODS
+        idx = methods.index(self.payment_var.get()) if self.payment_var.get() in methods else 0
+        self.payment_var.set(methods[(idx + 1) % len(methods)])
+        self.winfo_toplevel().set_status(f"Payment: {self.payment_var.get()}")
 
     def on_search(self, event):
         query = self.search_var.get().strip()
@@ -209,15 +230,8 @@ class InvoiceTab(ctk.CTkFrame):
             self.search_results.configure(values=[])
             self.current_search_products = []
             return
-
-        products = search_products(query)
-        self.current_search_products = products
-
-        values = []
-        for p in products:
-            sn_text = f" S/N:{p.serial_number}" if p.serial_number else ""
-            values.append(f"{p.name}{sn_text} ${p.price:.2f} [{p.qty}]")
-
+        self.current_search_products = search_products(query)
+        values = [f"{p.sku or '—'} · {p.name} · {format_currency(p.price)}" for p in self.current_search_products]
         self.search_results.configure(values=values)
         if values:
             self.search_results.set(values[0])
@@ -226,81 +240,55 @@ class InvoiceTab(ctk.CTkFrame):
         selection = self.search_results.get()
         if not selection:
             return
-
         idx = self.search_results._values.index(selection) if selection in self.search_results._values else -1
-        if idx >= 0 and idx < len(self.current_search_products):
-            p = self.current_search_products[idx]
-
-            if p.qty <= 0:
-                messagebox.showwarning("Out of Stock", f"Product '{p.name}' is out of stock.")
-                return
-
-            item = InvoiceItem(
-                id=None,
-                invoice_id=None,
-                product_id=p.id,
-                description=p.name,
-                serial_number=p.serial_number or "",
-                qty=1,
-                unit_price=p.price,
-                line_total=p.price,
-            )
-            self.items.append(item)
-            self.refresh_items()
-
-            self.search_var.set("")
-            self.search_results.set("")
-            self.search_results.configure(values=[])
-            self.current_search_products = []
-            self.man_desc.focus_set()
+        if idx < 0 or idx >= len(self.current_search_products):
+            return
+        p = self.current_search_products[idx]
+        if p.qty <= 0:
+            messagebox.showwarning("Out of stock", f"'{p.name}' has no stock left.")
+            return
+        self.items.append(InvoiceItem(
+            id=None, invoice_id=None, product_id=p.id,
+            description=p.name, serial_number=p.serial_number or "",
+            qty=1, unit_price=p.price, line_total=p.price,
+        ))
+        self.refresh_items()
+        self.search_var.set("")
+        self.search_results.configure(values=[])
+        self.current_search_products = []
 
     def add_manual_item(self):
         desc = self.man_desc.get().strip()
-        qty_str = self.man_qty.get().strip()
-        price_str = self.man_price.get().strip()
-
         if not desc:
-            messagebox.showerror("Error", "Description is required.")
+            messagebox.showerror("Missing description", "Enter a description for the line item.")
             self.man_desc.focus_set()
             return
-
         try:
-            qty = int(qty_str)
+            qty = int(self.man_qty.get().strip())
             if qty <= 0:
                 raise ValueError
         except ValueError:
-            messagebox.showerror("Error", "Quantity must be a positive integer.")
+            messagebox.showerror("Invalid quantity", "Quantity must be a positive whole number.")
             self.man_qty.focus_set()
             return
-
         try:
-            price = float(price_str)
+            price = float(self.man_price.get().strip())
             if price < 0:
                 raise ValueError
         except ValueError:
-            messagebox.showerror("Error", "Price must be a valid number.")
+            messagebox.showerror("Invalid price", "Enter a valid price.")
             self.man_price.focus_set()
             return
-
-        item = InvoiceItem(
-            id=None,
-            invoice_id=None,
-            product_id=None,
-            description=desc,
-            serial_number="",
-            qty=qty,
-            unit_price=price,
-            line_total=qty * price,
-        )
-        self.items.append(item)
+        self.items.append(InvoiceItem(
+            id=None, invoice_id=None, product_id=None,
+            description=desc, serial_number="", qty=qty, unit_price=price, line_total=qty * price,
+        ))
         self.refresh_items()
-
         self.man_desc.delete(0, "end")
         self.man_qty.delete(0, "end")
         self.man_qty.insert(0, "1")
         self.man_price.delete(0, "end")
         self.man_desc.focus_set()
-        self.winfo_toplevel().set_status(f"Added: {desc}")
 
     def remove_item(self, index):
         if 0 <= index < len(self.items):
@@ -308,48 +296,45 @@ class InvoiceTab(ctk.CTkFrame):
             self.refresh_items()
 
     def refresh_items(self):
-        for widget in self.item_rows_frame.winfo_children():
-            widget.destroy()
+        for w in self.item_rows_frame.winfo_children():
+            w.destroy()
 
-        widths = [40, 45, 260, 130, 90, 100, 50]
-        subtotal = 0.0
-
+        widths = [28, 200, 100, 40, 72, 80]
         for i, item in enumerate(self.items):
-            row_frame = ctk.CTkFrame(self.item_rows_frame, fg_color="transparent")
-            row_frame.pack(fill="x", pady=1)
-
-            ctk.CTkLabel(row_frame, text=str(i + 1), width=widths[0], anchor="w", **T.label_kwargs()).pack(side="left", padx=4)
-            ctk.CTkLabel(row_frame, text=str(item.qty), width=widths[1], anchor="w", **T.label_kwargs()).pack(side="left", padx=4)
-            ctk.CTkLabel(row_frame, text=item.description, width=widths[2], anchor="w", **T.label_kwargs()).pack(side="left", padx=4)
-            ctk.CTkLabel(row_frame, text=item.serial_number or "-", width=widths[3], anchor="w", **T.label_kwargs()).pack(side="left", padx=4)
-            ctk.CTkLabel(row_frame, text=format_currency(item.unit_price), width=widths[4], anchor="w", **T.label_kwargs()).pack(side="left", padx=4)
-            ctk.CTkLabel(row_frame, text=format_currency(item.line_total), width=widths[5], anchor="w", font=T.FONT_BOLD, text_color=T.LABEL_ACCENT).pack(
-                side="left", padx=4
-            )
-            ctk.CTkButton(row_frame, text="X", width=widths[6], command=lambda idx=i: self.remove_item(idx), **T.danger_button_kwargs()).pack(
-                side="left", padx=4
-            )
-
-            subtotal += item.line_total
+            row = ctk.CTkFrame(self.item_rows_frame, fg_color=T.SURFACE if i % 2 == 0 else "transparent", corner_radius=T.RADIUS_SM)
+            row.pack(fill="x", pady=1)
+            cells = [str(i + 1), item.description, item.serial_number or "—", str(item.qty),
+                     format_currency(item.unit_price), format_currency(item.line_total)]
+            for text, w in zip(cells, widths):
+                ctk.CTkLabel(row, text=text, width=w, anchor="w", font=T.FONT, text_color=T.TEXT).pack(side="left", padx=4, pady=6)
+            ctk.CTkButton(row, text="×", command=lambda idx=i: self.remove_item(idx), **T.danger_button_kwargs()).pack(side="right", padx=4)
 
         self.tax_rate = float(get_setting("tax_rate", "0.13"))
-        tax_amount = subtotal * self.tax_rate
-        total = subtotal + tax_amount
-        tax_pct = int(self.tax_rate * 100)
+        dtype = self.discount_type.get()
+        dval = self._get_discount_value()
+        subtotal, discount_amount, tax_amount, total = compute_invoice_totals(self.items, self.tax_rate, dtype, dval)
 
-        self.subtotal_label.configure(text=f"Sub Total: {format_currency(subtotal)}")
-        self.tax_label.configure(text=f"Tax ({tax_pct}%): {format_currency(tax_amount)}")
-        self.total_label.configure(text=f"Total: {format_currency(total)}")
+        self.subtotal_label.configure(text=format_currency(subtotal))
+        if discount_amount > 0:
+            label = f"−{format_currency(discount_amount)}"
+            if dtype == "percent":
+                label += f" ({dval:g}%)"
+            self.discount_summary_label.configure(text=label)
+        else:
+            self.discount_summary_label.configure(text="−$0.00")
+        self.tax_label.configure(text=format_currency(tax_amount))
+        self.tax_label._title_label.configure(text=self._tax_caption())
+        self.total_label.configure(text=format_currency(total))
 
     def save(self, print_rcpt=True):
         if not self.items:
-            messagebox.showwarning("Warning", "Cannot save an empty invoice.")
+            messagebox.showwarning("Empty invoice", "Add at least one line item before saving.")
             return
 
-        subtotal = sum(item.line_total for item in self.items)
         self.tax_rate = float(get_setting("tax_rate", "0.13"))
-        tax_amount = subtotal * self.tax_rate
-        total = subtotal + tax_amount
+        dtype = self.discount_type.get()
+        dval = self._get_discount_value()
+        subtotal, discount_amount, tax_amount, total = compute_invoice_totals(self.items, self.tax_rate, dtype, dval)
 
         invoice = Invoice(
             id=None,
@@ -364,39 +349,35 @@ class InvoiceTab(ctk.CTkFrame):
             notes=self.notes_entry.get().strip(),
             created_at=None,
             items=[],
+            discount_type=dtype if dval > 0 else "",
+            discount_value=dval,
+            discount_amount=discount_amount,
         )
 
         try:
             save_invoice(invoice, self.items)
-            msg = f"Invoice {invoice.invoice_number} saved!"
-
+            msg = f"Saved {invoice.invoice_number}"
             if print_rcpt:
                 from datetime import datetime
-
                 invoice.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                if print_receipt(invoice, self.items):
-                    msg += " Printed."
-                else:
-                    msg += " Print failed - check settings."
-
+                msg += " · Printed" if print_receipt(invoice, self.items) else " · Print failed"
             self.winfo_toplevel().set_status(msg)
             self.clear_form()
-
             app = self.winfo_toplevel()
             if hasattr(app, "inventory_tab"):
                 app.inventory_tab.load_products()
             if hasattr(app, "reports_tab"):
                 app.reports_tab.load_invoices()
-
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save invoice: {str(e)}")
+            messagebox.showerror("Save failed", str(e))
 
     def clear_form(self):
         self.customer_name_entry.delete(0, "end")
         self.customer_phone_entry.delete(0, "end")
         self.notes_entry.delete(0, "end")
+        self.discount_entry.delete(0, "end")
+        self.discount_type.set("percent")
         self.items = []
         self.payment_var.set("Cash")
-        self._update_payment_status()
         self.refresh_items()
-        self.man_desc.focus_set()
+        self.focus_customer()

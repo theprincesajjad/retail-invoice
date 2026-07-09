@@ -83,6 +83,12 @@ def print_receipt(invoice: Invoice, items: list[InvoiceItem]):
         tax_rate_pct = int(invoice.tax_rate * 100)
         
         p.text(f"Subtotal: {subtotal_str:>10}\n")
+        if getattr(invoice, "discount_amount", 0) and invoice.discount_amount > 0:
+            disc_str = format_currency(invoice.discount_amount)
+            if invoice.discount_type == "percent":
+                p.text(f"Discount ({invoice.discount_value:g}%): {disc_str:>10}\n")
+            else:
+                p.text(f"Discount: {disc_str:>10}\n")
         p.text(f"HST ({tax_rate_pct}%): {tax_str:>10}\n")
         p.set(bold=True)
         p.text(f"TOTAL: {total_str:>10}\n")

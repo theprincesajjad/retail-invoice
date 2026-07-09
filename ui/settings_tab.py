@@ -19,70 +19,63 @@ class SettingsTab(ctk.CTkFrame):
         self.load_settings()
 
     def load_ui(self):
-        bus_frame = ctk.CTkFrame(self, **T.panel_kwargs())
-        bus_frame.grid(row=0, column=0, padx=8, pady=8, sticky="nsew")
+        bus_frame = ctk.CTkFrame(self, **T.card_kwargs())
+        bus_frame.grid(row=0, column=0, padx=4, pady=4, sticky="nsew")
 
-        ctk.CTkLabel(bus_frame, text="Business Information", font=T.FONT_BOLD, text_color=T.LABEL_ACCENT).pack(pady=10)
+        bus_inner = ctk.CTkFrame(bus_frame, fg_color="transparent")
+        bus_inner.pack(fill="both", expand=True, padx=24, pady=24)
 
-        fields = [
-            ("Business Name", "business_name"),
+        T.section_title(bus_inner, "Business", "Shown on printed receipts").pack(anchor="w", pady=(0, 16))
+
+        for label, key in [
+            ("Business name", "business_name"),
             ("Address", "business_address"),
             ("Phone", "business_phone"),
-            ("GST/HST Number", "gst_number"),
-            ("Tax Rate (e.g. 0.13 for 13%)", "tax_rate"),
-        ]
-
-        for label, key in fields:
-            f = ctk.CTkFrame(bus_frame, fg_color="transparent")
-            f.pack(fill="x", padx=20, pady=5)
-            ctk.CTkLabel(f, text=label, width=200, anchor="w", **T.label_kwargs()).pack(side="left")
-            entry = ctk.CTkEntry(f, **T.entry_kwargs(250))
-            entry.pack(side="left", expand=True, fill="x")
+            ("GST/HST number", "gst_number"),
+            ("Tax rate (0.13 = 13%)", "tax_rate"),
+        ]:
+            ctk.CTkLabel(bus_inner, text=label, **T.label_secondary()).pack(anchor="w", pady=(0, 4))
+            entry = ctk.CTkEntry(bus_inner, **T.entry_kwargs())
+            entry.pack(fill="x", pady=(0, 12))
             self.entries[key] = entry
 
-        print_frame = ctk.CTkFrame(self, **T.panel_kwargs())
-        print_frame.grid(row=0, column=1, padx=8, pady=8, sticky="nsew")
+        print_frame = ctk.CTkFrame(self, **T.card_kwargs())
+        print_frame.grid(row=0, column=1, padx=4, pady=4, sticky="nsew")
 
-        ctk.CTkLabel(print_frame, text="Receipt & Printer", font=T.FONT_BOLD, text_color=T.LABEL_ACCENT).pack(pady=10)
+        pr_inner = ctk.CTkFrame(print_frame, fg_color="transparent")
+        pr_inner.pack(fill="both", expand=True, padx=24, pady=24)
 
-        logo_f = ctk.CTkFrame(print_frame, fg_color="transparent")
-        logo_f.pack(fill="x", padx=20, pady=5)
-        ctk.CTkLabel(logo_f, text="Logo Path", width=120, anchor="w", **T.label_kwargs()).pack(side="left")
-        self.entries["logo_path"] = ctk.CTkEntry(logo_f, **T.entry_kwargs(200))
-        self.entries["logo_path"].pack(side="left", expand=True, fill="x", padx=5)
-        ctk.CTkButton(logo_f, text="Browse", width=60, command=self.browse_logo, **T.button_kwargs()).pack(side="left")
+        T.section_title(pr_inner, "Printer", "Windows shared printer name").pack(anchor="w", pady=(0, 16))
 
-        ptr_f = ctk.CTkFrame(print_frame, fg_color="transparent")
-        ptr_f.pack(fill="x", padx=20, pady=5)
-        ctk.CTkLabel(ptr_f, text="Printer Name\n(Windows Share Name)", width=150, anchor="w", **T.label_kwargs()).pack(side="left")
-        self.entries["printer_name"] = ctk.CTkEntry(ptr_f, placeholder_text="e.g. EPSON TM-T20 Receipt", **T.entry_kwargs(250))
-        self.entries["printer_name"].pack(side="left", expand=True, fill="x")
+        ctk.CTkLabel(pr_inner, text="Logo", **T.label_secondary()).pack(anchor="w")
+        logo_row = ctk.CTkFrame(pr_inner, fg_color="transparent")
+        logo_row.pack(fill="x", pady=(4, 12))
+        self.entries["logo_path"] = ctk.CTkEntry(logo_row, **T.entry_kwargs())
+        self.entries["logo_path"].pack(side="left", fill="x", expand=True, padx=(0, 8))
+        ctk.CTkButton(logo_row, text="Browse", command=self.browse_logo, **T.button_kwargs(width=72)).pack(side="left")
 
-        width_f = ctk.CTkFrame(print_frame, fg_color="transparent")
-        width_f.pack(fill="x", padx=20, pady=5)
-        ctk.CTkLabel(width_f, text="Receipt Width", width=150, anchor="w", **T.label_kwargs()).pack(side="left")
+        ctk.CTkLabel(pr_inner, text="Printer name", **T.label_secondary()).pack(anchor="w", pady=(0, 4))
+        self.entries["printer_name"] = ctk.CTkEntry(pr_inner, placeholder_text="EPSON TM-T20 Receipt", **T.entry_kwargs())
+        self.entries["printer_name"].pack(fill="x", pady=(0, 12))
+
+        ctk.CTkLabel(pr_inner, text="Receipt width", **T.label_secondary()).pack(anchor="w", pady=(0, 4))
         self.width_var = ctk.StringVar(value="80mm")
+        w_row = ctk.CTkFrame(pr_inner, fg_color="transparent")
+        w_row.pack(anchor="w")
         for val in ("80mm", "58mm"):
             ctk.CTkRadioButton(
-                width_f,
-                text=val,
-                variable=self.width_var,
-                value=val,
-                text_color=T.TEXT,
-                fg_color=T.HEADER_BG,
-                hover_color=T.LABEL_ACCENT,
-                border_color=T.BORDER,
-                font=T.FONT,
-            ).pack(side="left", padx=10)
+                w_row, text=val, variable=self.width_var, value=val,
+                font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
+            ).pack(side="left", padx=(0, 16))
 
         save_f = ctk.CTkFrame(self, fg_color="transparent")
-        save_f.grid(row=1, column=0, columnspan=2, pady=20)
-        ctk.CTkButton(save_f, text="Save Settings", command=self.save_settings, width=200, height=40, **T.primary_button_kwargs()).pack()
+        save_f.grid(row=1, column=0, columnspan=2, pady=16)
+        ctk.CTkButton(save_f, text="Save settings", command=self.save_settings, **T.primary_button_kwargs(width=160)).pack()
 
     def browse_logo(self):
         filepath = filedialog.askopenfilename(
-            title="Select Logo Image",
-            filetypes=(("Image files", "*.png *.jpg *.bmp"), ("All files", "*.*")),
+            title="Select logo",
+            filetypes=(("Images", "*.png *.jpg *.bmp"), ("All", "*.*")),
         )
         if filepath:
             dest = ASSETS_DIR / os.path.basename(filepath)
@@ -91,7 +84,7 @@ class SettingsTab(ctk.CTkFrame):
                 self.entries["logo_path"].delete(0, "end")
                 self.entries["logo_path"].insert(0, str(dest))
             except Exception as e:
-                messagebox.showerror("Error", f"Could not copy image: {e}")
+                messagebox.showerror("Error", str(e))
 
     def load_settings(self):
         settings = get_all_settings()
@@ -99,7 +92,6 @@ class SettingsTab(ctk.CTkFrame):
             if key in settings:
                 entry.delete(0, "end")
                 entry.insert(0, settings[key])
-
         if "receipt_width" in settings:
             self.width_var.set(settings["receipt_width"])
 
@@ -107,10 +99,8 @@ class SettingsTab(ctk.CTkFrame):
         try:
             for key, entry in self.entries.items():
                 save_setting(key, entry.get().strip())
-
             save_setting("receipt_width", self.width_var.get())
-
-            self.winfo_toplevel().set_status("Settings saved successfully!")
-            messagebox.showinfo("Success", "Settings have been saved.")
+            self.winfo_toplevel().set_status("Settings saved")
+            messagebox.showinfo("Saved", "Settings have been saved.")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save settings: {e}")
+            messagebox.showerror("Error", str(e))
