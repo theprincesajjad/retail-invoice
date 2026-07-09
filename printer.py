@@ -3,6 +3,7 @@ import logging
 from database import get_all_settings, get_setting
 from models import Invoice, InvoiceItem
 from utils import format_currency
+from config import DATA_DIR, ASSETS_DIR
 
 def get_printer_width_chars(width_setting):
     if width_setting == "58mm":
@@ -23,6 +24,18 @@ def print_receipt(invoice: Invoice, items: list[InvoiceItem]):
         
         # Logo printing
         logo_path = settings.get("logo_path", "")
+        # If the saved path no longer exists (common after upgrades),
+        # fall back to the app's data/assets folders.
+        if logo_path and not os.path.exists(logo_path):
+            base = os.path.basename(logo_path)
+            for candidate in (DATA_DIR / base, DATA_DIR / "logo.png", DATA_DIR / "logo.jpg", ASSETS_DIR / base):
+                try:
+                    if candidate and os.path.exists(candidate):
+                        logo_path = str(candidate)
+                        break
+                except Exception:
+                    pass
+
         if logo_path and os.path.exists(logo_path):
             try:
                 p.image(logo_path)

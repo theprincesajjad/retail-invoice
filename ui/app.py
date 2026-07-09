@@ -1,4 +1,5 @@
 import sys
+import platform
 import customtkinter as ctk
 from pathlib import Path
 from .invoice_tab import InvoiceTab
@@ -36,8 +37,19 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title(f"Retail Invoice  {get_app_version()}")
-        self.geometry("1320x840")
-        self.minsize(1140, 720)
+        # Launch sized to the current screen and maximize where supported,
+        # so action buttons are never cut off on smaller displays.
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"{max(1100, sw)}x{max(720, sh)}+0+0")
+        self.minsize(1020, 680)
+        try:
+            if platform.system() == "Windows":
+                # Most reliable "full screen" behavior for desktop apps.
+                self.state("zoomed")
+            else:
+                self.attributes("-zoomed", True)
+        except Exception:
+            pass
         self.configure(fg_color=T.BG)
 
         self.grid_rowconfigure(1, weight=1)

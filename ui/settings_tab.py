@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox
 from database import get_all_settings, save_setting
 import os
 import shutil
-from config import ASSETS_DIR
+from config import DATA_DIR
 from . import theme as T
 
 
@@ -55,7 +55,21 @@ class SettingsTab(ctk.CTkFrame):
         self.entries["logo_path"].pack(side="left", fill="x", expand=True, padx=(0, 8))
         ctk.CTkButton(logo_row, text="Browse", command=self.browse_logo, **T.button_kwargs(width=72)).pack(side="left")
 
-        self._field(pr_inner, "Printer name", "printer_name", placeholder="EPSON TM-T20 Receipt")
+        ctk.CTkLabel(pr_inner, text="Printer", **T.label_secondary()).pack(anchor="w", pady=(0, 4))
+        pr_row = ctk.CTkFrame(pr_inner, fg_color="transparent")
+        pr_row.pack(fill="x", pady=(0, 12))
+        pr_row.grid_columnconfigure(0, weight=1)
+
+        self.printer_var = ctk.StringVar(value="")
+        self.printer_combo = ctk.CTkComboBox(pr_row, variable=self.printer_var, values=[], **T.combo_kwargs(width=260))
+        self.printer_combo.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ctk.CTkButton(pr_row, text="Refresh", command=self.refresh_printers, **T.button_kwargs(width=84)).grid(
+            row=0, column=1, sticky="e"
+        )
+
+        # Backing setting field (also supports manual typing in case printer enumeration fails)
+        self.entries["printer_name"] = ctk.CTkEntry(pr_inner, placeholder_text="Type printer name if not listed", **T.entry_kwargs())
+        self.entries["printer_name"].pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(pr_inner, text="Receipt width", **T.label_secondary()).pack(anchor="w", pady=(0, 4))
         self.width_var = ctk.StringVar(value="80mm")
@@ -112,6 +126,8 @@ class SettingsTab(ctk.CTkFrame):
         save_f.pack(fill="x", pady=12)
         ctk.CTkButton(save_f, text="Save settings", command=self.save_settings, **T.primary_button_kwargs(width=180)).pack()
 
+        self.refresh_printers()
+
     def _field(self, parent, label, key, placeholder=""):
         ctk.CTkLabel(parent, text=label, **T.label_secondary()).pack(anchor="w", pady=(0, 4))
         kw = T.entry_kwargs()
@@ -127,13 +143,45 @@ class SettingsTab(ctk.CTkFrame):
             filetypes=(("Images", "*.png *.jpg *.bmp"), ("All", "*.*")),
         )
         if filepath:
-            dest = ASSETS_DIR / os.path.basename(filepath)
+            ext = os.path.splitext(filepath)[1].lower() or ".png"
+            dest = DATA_DIR / f"logo{ext}"
             try:
                 shutil.copy(filepath, dest)
                 self.entries["logo_path"].delete(0, "end")
                 self.entries["logo_path"].insert(0, str(dest))
             except Exception as e:
                 messagebox.showerror("Error", str(e))
+
+    def refresh_printers(self):
+        printers: list[str] = []
+        try:
+            import platform
+
+            if platform.system() == "Windows":
+                import win32print  # type: ignore
+
+                flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+                for p in win32print.EnumPrinters(flags):
+                    # Tuple shape: (flags, description, name, comment)
+                    printers.append(p[2])
+        except Exception:
+            printers = []
+
+        printers = sorted(set([p for p in printers if p]))
+        self.printer_combo.configure(values=printers)
+        if printers and not self.printer_var.get():
+            self.printer_var.set(printers[0])
+            self.entries["printer_name"].delete(0, "end")
+            self.entries["printer_name"].insert(0, printers[0])
+
+        # Keep manual field in sync when selecting from combo
+        def _sync(*_):
+            val = self.printer_var.get().strip()
+            if val:
+                self.entries["printer_name"].delete(0, "end")
+                self.entries["printer_name"].insert(0, val)
+
+        self.printer_combo.configure(command=lambda _: _sync())
 
     def load_settings(self):
         settings = get_all_settings()
@@ -143,6 +191,8 @@ class SettingsTab(ctk.CTkFrame):
                 entry.insert(0, settings[key])
         if "receipt_width" in settings:
             self.width_var.set(settings["receipt_width"])
+        if "printer_name" in settings:
+            self.printer_var.set(settings["printer_name"])
 
     def save_settings(self):
         try:
