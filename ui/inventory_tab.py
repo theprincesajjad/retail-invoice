@@ -74,8 +74,8 @@ class InventoryTab(ctk.CTkFrame):
 
             actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[5])
             actions.pack(side="left", padx=6)
-            ctk.CTkButton(actions, text="Edit", width=52, height=30, command=lambda prod=p: self.show_product_dialog(prod), **T.button_kwargs(height=30)).pack(side="left", padx=2)
-            ctk.CTkButton(actions, text="Delete", width=58, height=30, command=lambda prod=p: self.delete_product(prod), **T.button_kwargs(height=30, text_color=T.DANGER)).pack(side="left", padx=2)
+            ctk.CTkButton(actions, text="Edit", width=52, command=lambda prod=p: self.show_product_dialog(prod), **T.button_kwargs(height=30)).pack(side="left", padx=2)
+            ctk.CTkButton(actions, text="Delete", width=58, command=lambda prod=p: self.delete_product(prod), **T.button_kwargs(height=30, text_color=T.DANGER)).pack(side="left", padx=2)
 
     def delete_product(self, product: Product):
         if messagebox.askyesno("Delete product", f"Remove '{product.name}' from inventory?"):

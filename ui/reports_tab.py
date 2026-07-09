@@ -167,7 +167,7 @@ class ReportsTab(ctk.CTkFrame):
             actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[-1])
             actions.pack(side="left", padx=4)
             ctk.CTkButton(
-                actions, text="Print", width=64, height=30,
+                actions, text="Print", width=64,
                 command=lambda inv_obj=inv: self.reprint_invoice(inv_obj),
                 **T.button_kwargs(height=30),
             ).pack(side="left")
