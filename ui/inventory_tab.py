@@ -23,16 +23,16 @@ class InventoryTab(ctk.CTkFrame):
         bar.grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 8))
 
         inner = ctk.CTkFrame(bar, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=14)
+        inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=12)
 
         ctk.CTkButton(
             inner,
-            text=T.with_shortcut("New product", "Alt+N"),
+            text=T.with_shortcut("Add item", "Alt+N"),
             command=self.show_product_dialog,
-            **T.primary_button_kwargs(width=160, height=38),
+            **T.primary_button_kwargs(width=140, height=36),
         ).pack(side="left")
 
-        ctk.CTkLabel(inner, text="Search", **T.label_secondary()).pack(side="left", padx=(24, 8))
+        T.field_label(inner, "Search", "Alt+S").pack(side="left", padx=(20, 8))
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(inner, textvariable=self.search_var, placeholder_text="SKU, description, or S/N…", **T.entry_kwargs(260))
         self.search_entry.pack(side="left")

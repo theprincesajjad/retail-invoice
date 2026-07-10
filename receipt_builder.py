@@ -107,15 +107,15 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
     lines.append(_center("Tax Receipt", width))
     lines.append(blank)
 
-    lines.append(_label_value("Order number", invoice.invoice_number, width))
+    lines.append(_label_value("Invoice", invoice.invoice_number, width))
     lines.append(_label_value("Date", _format_receipt_date(invoice.created_at), width))
-    lines.append(_label_value("Payment method", invoice.payment_method, width))
 
-    if invoice.customer_name:
+    if invoice.customer_name or invoice.customer_phone:
         lines.append(blank)
-        lines.append(_label_value("Customer", invoice.customer_name, width))
-    if invoice.customer_phone:
-        lines.append(_label_value("Phone", invoice.customer_phone, width))
+        if invoice.customer_name:
+            lines.append(_label_value("Customer", invoice.customer_name, width))
+        if invoice.customer_phone:
+            lines.append(_label_value("Phone", invoice.customer_phone, width))
 
     lines.append(blank)
     lines.append(rule)
@@ -151,16 +151,8 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
             lines.append(money_row("Discount", invoice.discount_amount))
     lines.append(money_row(f"HST ({tax_pct}%)", invoice.tax_amount))
     lines.append(money_row("Total", invoice.total))
+    lines.append(_label_value("Payment", invoice.payment_method, width))
     lines.append(blank)
-
-    if invoice.customer_name:
-        bill = invoice.customer_name
-        if invoice.customer_phone:
-            bill = f"{bill}  {invoice.customer_phone}"
-        half = width // 2
-        lines.append(f"{'Billing':<{half}}{'Shipping':>{half}}")
-        lines.append(f"{bill[:half]:<{half}}{'N/A':>{half}}")
-        lines.append(blank)
 
     lines.append(_center("Thank You!", width))
     lines.append(blank)

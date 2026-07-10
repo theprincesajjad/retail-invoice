@@ -42,22 +42,22 @@ class InvoiceTab(ctk.CTkFrame):
         card.grid(row=0, column=0, columnspan=2, sticky="ew", padx=4, pady=(4, 8))
 
         inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=16)
+        inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=T.PAD_CARD)
 
-        T.section_title(inner, "Customer").pack(anchor="w", pady=(0, 12))
+        T.section_title(inner, "Customer", "Optional — shows on the receipt").pack(anchor="w", pady=(0, 10))
 
         fields = ctk.CTkFrame(inner, fg_color="transparent")
         fields.pack(fill="x")
 
         name_col = ctk.CTkFrame(fields, fg_color="transparent")
-        name_col.pack(side="left", fill="x", expand=True, padx=(0, 12))
-        ctk.CTkLabel(name_col, text="Name  ·  Alt+C", **T.label_secondary()).pack(anchor="w")
-        self.customer_name_entry = ctk.CTkEntry(name_col, placeholder_text="Customer name", **T.entry_kwargs())
+        name_col.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        T.field_label(name_col, "Name", "Alt+C").pack(anchor="w")
+        self.customer_name_entry = ctk.CTkEntry(name_col, placeholder_text="Walk-in customer", **T.entry_kwargs())
         self.customer_name_entry.pack(fill="x", pady=(4, 0))
 
         phone_col = ctk.CTkFrame(fields, fg_color="transparent")
         phone_col.pack(side="left", fill="x", expand=True)
-        ctk.CTkLabel(phone_col, text="Phone  ·  Alt+P", **T.label_secondary()).pack(anchor="w")
+        T.field_label(phone_col, "Phone", "Alt+P").pack(anchor="w")
         self.customer_phone_entry = ctk.CTkEntry(phone_col, placeholder_text="(416) 555-0100", **T.entry_kwargs())
         self.customer_phone_entry.pack(fill="x", pady=(4, 0))
 
@@ -70,14 +70,9 @@ class InvoiceTab(ctk.CTkFrame):
         add_card = ctk.CTkFrame(left, **T.card_kwargs())
         add_card.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         add_inner = ctk.CTkFrame(add_card, fg_color="transparent")
-        add_inner.pack(fill="x", padx=20, pady=16)
+        add_inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=T.PAD_CARD)
 
-        ctk.CTkLabel(add_inner, text="Stock search", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(anchor="w", pady=(0, 4))
-        ctk.CTkLabel(
-            add_inner,
-            text="Type SKU or name · Enter adds selected item · Alt+S focuses search",
-            **T.label_secondary(),
-        ).pack(anchor="w", pady=(0, 10))
+        T.section_title(add_inner, "Find in stock", "Search by SKU or product name").pack(anchor="w", pady=(0, 8))
 
         row1 = ctk.CTkFrame(add_inner, fg_color="transparent")
         row1.pack(fill="x", pady=(0, 8))
@@ -105,25 +100,25 @@ class InvoiceTab(ctk.CTkFrame):
         self.current_search_products = []
 
         row2 = ctk.CTkFrame(add_inner, fg_color="transparent")
-        row2.pack(fill="x")
-        ctk.CTkLabel(row2, text="Manual entry  ·  Alt+M", **T.label_secondary()).pack(side="left", padx=(0, 12))
+        row2.pack(fill="x", pady=(4, 0))
+        T.field_label(row2, "Custom line", "Alt+M").pack(side="left", padx=(0, 10))
         self.man_desc = ctk.CTkEntry(row2, placeholder_text="Description", **T.entry_kwargs(340))
         self.man_desc.pack(side="left", fill="x", expand=True, padx=(0, 6))
-        self.man_qty = ctk.CTkEntry(row2, placeholder_text="Qty", width=64, height=36, fg_color=T.SURFACE_ALT, border_color=T.BORDER, corner_radius=T.RADIUS_SM)
+        self.man_qty = ctk.CTkEntry(row2, placeholder_text="Qty", **T.entry_kwargs(64))
         self.man_qty.insert(0, "1")
         self.man_qty.pack(side="left", padx=(0, 6))
-        self.man_price = ctk.CTkEntry(row2, placeholder_text="Price", width=88, height=36, fg_color=T.SURFACE_ALT, border_color=T.BORDER, corner_radius=T.RADIUS_SM)
+        self.man_price = ctk.CTkEntry(row2, placeholder_text="Price", **T.entry_kwargs(88))
         self.man_price.pack(side="left", padx=(0, 8))
-        ctk.CTkButton(row2, text=T.with_shortcut("Add line", "Alt+A"), width=120, command=self.add_manual_item, **T.button_kwargs()).pack(side="left")
+        ctk.CTkButton(row2, text=T.with_shortcut("Add line", "Alt+A"), width=110, command=self.add_manual_item, **T.button_kwargs()).pack(side="left")
 
         lines_card = ctk.CTkFrame(left, **T.card_kwargs())
         lines_card.grid(row=1, column=0, sticky="nsew")
         lines_inner = ctk.CTkFrame(lines_card, fg_color="transparent")
-        lines_inner.pack(fill="both", expand=True, padx=20, pady=16)
+        lines_inner.pack(fill="both", expand=True, padx=T.PAD_CARD + 4, pady=T.PAD_CARD)
         lines_inner.grid_rowconfigure(1, weight=1)
         lines_inner.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(lines_inner, text="Line items", font=T.FONT_MEDIUM, text_color=T.TEXT).grid(row=0, column=0, sticky="w", pady=(0, 8))
+        ctk.CTkLabel(lines_inner, text="Items", font=T.FONT_MEDIUM, text_color=T.TEXT).grid(row=0, column=0, sticky="w", pady=(0, 6))
 
         self.items_scroll = ctk.CTkScrollableFrame(lines_inner, fg_color=T.SURFACE_ALT, corner_radius=T.RADIUS_SM)
         self.items_scroll.grid(row=1, column=0, sticky="nsew")
@@ -149,9 +144,9 @@ class InvoiceTab(ctk.CTkFrame):
         summary.pack(fill="x", pady=(0, 8))
 
         s_inner = ctk.CTkFrame(summary, fg_color="transparent")
-        s_inner.pack(fill="x", padx=20, pady=20)
+        s_inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=T.PAD_CARD)
 
-        T.section_title(s_inner, "Summary").pack(anchor="w", pady=(0, 16))
+        T.section_title(s_inner, "Summary").pack(anchor="w", pady=(0, 12))
 
         self.subtotal_label = self._summary_row(s_inner, "Subtotal", "$0.00")
         self.discount_summary_label = self._summary_row(s_inner, "Discount", "−$0.00")
@@ -165,9 +160,9 @@ class InvoiceTab(ctk.CTkFrame):
         discount_card = ctk.CTkFrame(scroll, **T.card_kwargs())
         discount_card.pack(fill="x", pady=(0, 8))
         d_inner = ctk.CTkFrame(discount_card, fg_color="transparent")
-        d_inner.pack(fill="x", padx=20, pady=16)
+        d_inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=T.PAD_CARD)
 
-        ctk.CTkLabel(d_inner, text="Discount  ·  Alt+D", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(anchor="w", pady=(0, 10))
+        T.field_label(d_inner, "Discount", "Alt+D").pack(anchor="w", pady=(0, 8))
 
         type_row = ctk.CTkFrame(d_inner, fg_color="transparent")
         type_row.pack(fill="x", pady=(0, 8))
@@ -189,9 +184,9 @@ class InvoiceTab(ctk.CTkFrame):
         pay_card = ctk.CTkFrame(scroll, **T.card_kwargs())
         pay_card.pack(fill="x", pady=(0, 8))
         p_inner = ctk.CTkFrame(pay_card, fg_color="transparent")
-        p_inner.pack(fill="x", padx=20, pady=16)
+        p_inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=T.PAD_CARD)
 
-        ctk.CTkLabel(p_inner, text="Payment  ·  F7 cycles", **T.label_secondary()).pack(anchor="w", pady=(0, 10))
+        T.field_label(p_inner, "Payment", "F7").pack(anchor="w", pady=(0, 8))
         self.payment_var = ctk.StringVar(value="Cash")
         pay_row = ctk.CTkFrame(p_inner, fg_color="transparent")
         pay_row.pack(fill="x")
@@ -204,9 +199,9 @@ class InvoiceTab(ctk.CTkFrame):
         notes_card = ctk.CTkFrame(scroll, **T.card_kwargs())
         notes_card.pack(fill="x", pady=(0, 8))
         n_inner = ctk.CTkFrame(notes_card, fg_color="transparent")
-        n_inner.pack(fill="x", padx=20, pady=16)
-        ctk.CTkLabel(n_inner, text="Notes", **T.label_secondary()).pack(anchor="w")
-        self.notes_entry = ctk.CTkEntry(n_inner, placeholder_text="Optional", **T.entry_kwargs())
+        n_inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=T.PAD_CARD)
+        T.field_label(n_inner, "Notes").pack(anchor="w")
+        self.notes_entry = ctk.CTkEntry(n_inner, placeholder_text="Internal note — not printed", **T.entry_kwargs())
         self.notes_entry.pack(fill="x", pady=(6, 0))
 
         self._build_action_dock()
@@ -217,25 +212,25 @@ class InvoiceTab(ctk.CTkFrame):
         dock.grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 4))
 
         inner = ctk.CTkFrame(dock, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=12)
+        inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=12)
 
         ctk.CTkButton(
             inner,
-            text=T.with_shortcut("Print & save", "F12"),
+            text=T.with_shortcut("Save and print", "F12"),
             command=lambda: self.save(print_rcpt=True),
-            **T.primary_button_kwargs(width=180, height=42),
-        ).pack(side="left", padx=(0, 10))
+            **T.primary_button_kwargs(width=170, height=40),
+        ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
             inner,
             text=T.with_shortcut("Save", "F11"),
             command=lambda: self.save(print_rcpt=False),
-            **T.button_kwargs(width=120, height=42),
-        ).pack(side="left", padx=(0, 10))
+            **T.button_kwargs(width=100, height=40),
+        ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
             inner,
-            text=T.with_shortcut("Clear", "F9"),
+            text=T.with_shortcut("Start over", "F9"),
             command=self.clear_form,
-            **T.button_kwargs(width=120, height=42),
+            **T.button_kwargs(width=110, height=40),
         ).pack(side="left")
 
     def _tax_caption(self):

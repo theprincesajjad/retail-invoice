@@ -27,9 +27,9 @@ class ReportsTab(ctk.CTkFrame):
         card.grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 8))
 
         inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=14)
+        inner.pack(fill="x", padx=T.PAD_CARD + 4, pady=12)
 
-        ctk.CTkLabel(inner, text="Period  ·  Alt+P", **T.label_secondary()).pack(side="left", padx=(0, 8))
+        T.field_label(inner, "Period", "Alt+P").pack(side="left", padx=(0, 8))
         self.period_var = ctk.StringVar(value="Monthly")
         self.period_combo = ctk.CTkComboBox(
             inner, variable=self.period_var, values=["Monthly", "Quarterly", "Yearly"],
@@ -44,7 +44,7 @@ class ReportsTab(ctk.CTkFrame):
         )
         self.range_combo.pack(side="left", padx=(0, 24))
 
-        ctk.CTkLabel(inner, text="Search  ·  Alt+S", **T.label_secondary()).pack(side="left", padx=(0, 8))
+        T.field_label(inner, "Search", "Alt+S").pack(side="left", padx=(0, 8))
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
             inner, textvariable=self.search_var,

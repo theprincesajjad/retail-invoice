@@ -32,7 +32,7 @@ class SettingsTab(ctk.CTkFrame):
         bus_frame.grid(row=0, column=0, padx=(0, 6), pady=4, sticky="nsew")
         bus_inner = ctk.CTkFrame(bus_frame, fg_color="transparent")
         bus_inner.pack(fill="both", expand=True, padx=24, pady=24)
-        T.section_title(bus_inner, "Business", "Shown on receipts and emails").pack(anchor="w", pady=(0, 16))
+        T.section_title(bus_inner, "Store details", "Printed on every receipt").pack(anchor="w", pady=(0, 14))
         for label, key in [
             ("Business name", "business_name"),
             ("Tagline", "business_tagline"),
@@ -53,7 +53,7 @@ class SettingsTab(ctk.CTkFrame):
         print_frame.grid(row=0, column=1, padx=(6, 0), pady=4, sticky="nsew")
         pr_inner = ctk.CTkFrame(print_frame, fg_color="transparent")
         pr_inner.pack(fill="both", expand=True, padx=24, pady=24)
-        T.section_title(pr_inner, "Printer", "Windows shared printer").pack(anchor="w", pady=(0, 16))
+        T.section_title(pr_inner, "Receipt printer", "Epson TM-T20 or any Windows printer").pack(anchor="w", pady=(0, 14))
 
         ctk.CTkLabel(pr_inner, text="Logo", **T.label_secondary()).pack(anchor="w")
         logo_row = ctk.CTkFrame(pr_inner, fg_color="transparent")
@@ -94,9 +94,9 @@ class SettingsTab(ctk.CTkFrame):
         em_inner.pack(fill="x", padx=24, pady=24)
         T.section_title(
             em_inner,
-            "Email (Gmail SMTP)",
-            "Use a Google App Password — not your regular Gmail password",
-        ).pack(anchor="w", pady=(0, 16))
+            "Email receipts",
+            "Gmail app password required — not your regular password",
+        ).pack(anchor="w", pady=(0, 14))
 
         row1 = ctk.CTkFrame(em_inner, fg_color="transparent")
         row1.pack(fill="x")
@@ -131,7 +131,7 @@ class SettingsTab(ctk.CTkFrame):
 
         save_f = ctk.CTkFrame(scroll, fg_color="transparent")
         save_f.pack(fill="x", pady=12)
-        ctk.CTkButton(save_f, text="Save settings", command=self.save_settings, **T.primary_button_kwargs(width=180)).pack()
+        ctk.CTkButton(save_f, text="Save settings", command=self.save_settings, **T.primary_button_kwargs(width=160)).pack()
 
         self.refresh_printers()
 
