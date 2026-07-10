@@ -20,9 +20,13 @@ ASSETS_DIR.mkdir(exist_ok=True)
 
 DEFAULT_SETTINGS = {
     "business_name": "My Business",
+    "business_tagline": "",
     "business_address": "123 Main St, City, ON",
+    "business_website": "",
     "business_phone": "(416) 555-0123",
+    "business_email": "",
     "gst_number": "123456789RT0001",
+    "receipt_footer": "All Sales are Final. No Returns or Exchanges.",
     "tax_rate": "0.13",
     "logo_path": str(ASSETS_DIR / "logo.png"),
     "printer_name": "",

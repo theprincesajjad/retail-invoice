@@ -35,12 +35,19 @@ class SettingsTab(ctk.CTkFrame):
         T.section_title(bus_inner, "Business", "Shown on receipts and emails").pack(anchor="w", pady=(0, 16))
         for label, key in [
             ("Business name", "business_name"),
+            ("Tagline", "business_tagline"),
             ("Address", "business_address"),
+            ("Website", "business_website"),
             ("Phone", "business_phone"),
+            ("Email", "business_email"),
             ("GST/HST number", "gst_number"),
             ("Tax rate (0.13 = 13%)", "tax_rate"),
         ]:
-            self._field(bus_inner, label, key)
+            self._field(bus_inner, label, key, placeholder="" if key != "business_tagline" else "Your Tech, Our Passion")
+
+        ctk.CTkLabel(bus_inner, text="Receipt footer policy", **T.label_secondary()).pack(anchor="w", pady=(4, 4))
+        self.receipt_footer = ctk.CTkTextbox(bus_inner, height=72, fg_color=T.SURFACE_ALT, border_color=T.BORDER, corner_radius=T.RADIUS_SM, font=T.FONT)
+        self.receipt_footer.pack(fill="x", pady=(0, 12))
 
         print_frame = ctk.CTkFrame(grid, **T.card_kwargs())
         print_frame.grid(row=0, column=1, padx=(6, 0), pady=4, sticky="nsew")
@@ -205,6 +212,9 @@ class SettingsTab(ctk.CTkFrame):
             self.width_var.set(settings["receipt_width"])
         if "printer_name" in settings:
             self.printer_var.set(settings["printer_name"])
+        if "receipt_footer" in settings:
+            self.receipt_footer.delete("1.0", "end")
+            self.receipt_footer.insert("1.0", settings["receipt_footer"])
 
     def save_settings(self):
         try:
@@ -217,6 +227,7 @@ class SettingsTab(ctk.CTkFrame):
             self.entries["printer_name"].delete(0, "end")
             self.entries["printer_name"].insert(0, printer)
             save_setting("receipt_width", self.width_var.get())
+            save_setting("receipt_footer", self.receipt_footer.get("1.0", "end").strip())
             self.winfo_toplevel().set_status("Settings saved")
             messagebox.showinfo("Saved", "Settings have been saved.")
         except Exception as e:

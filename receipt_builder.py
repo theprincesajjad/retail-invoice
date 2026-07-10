@@ -1,4 +1,10 @@
-"""Shared receipt text formatting for print, preview, and email."""
+"""Shared receipt layout for print preview, thermal print, and email."""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime
+from io import BytesIO
 
 from database import get_all_settings
 from models import Invoice, InvoiceItem
@@ -9,60 +15,233 @@ def get_printer_width_chars(width_setting: str) -> int:
     return 32 if width_setting == "58mm" else 48
 
 
-def build_receipt_text(invoice: Invoice, items: list[InvoiceItem]) -> str:
-    settings = get_all_settings()
+def _center(text: str, width: int) -> str:
+    text = (text or "").strip()
+    if not text:
+        return ""
+    if len(text) >= width:
+        return text[:width]
+    pad = (width - len(text)) // 2
+    return " " * pad + text
+
+
+def _label_value(label: str, value: str, width: int) -> str:
+    label = f"{label}:"
+    value = value or ""
+    gap = width - len(label) - len(value)
+    if gap < 1:
+        return f"{label} {value}"[:width]
+    return label + (" " * gap) + value
+
+
+def _format_receipt_date(created_at: str | None) -> str:
+    if not created_at:
+        return "Just now"
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            dt = datetime.strptime(created_at, fmt)
+            formatted = dt.strftime("%B %d, %Y, %I:%M %p")
+            if formatted.startswith("0"):
+                formatted = formatted.replace(" 0", " ", 1)
+            return formatted.replace(" 0", " ").replace("AM", "am").replace("PM", "pm")
+        except ValueError:
+            continue
+    return created_at
+
+
+def _item_columns(width: int) -> tuple[int, int, int, int]:
+    if width <= 32:
+        return 14, 3, 7, 7
+    return 20, 4, 10, 10
+
+
+def _wrap_text(text: str, width: int) -> list[str]:
+    text = (text or "").strip()
+    if not text:
+        return [""]
+    if len(text) <= width:
+        return [text]
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = word if not current else f"{current} {word}"
+        if len(candidate) <= width:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word[:width]
+    if current:
+        lines.append(current)
+    return lines or [""]
+
+
+def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dict | None = None) -> str:
+    settings = settings or get_all_settings()
     width = get_printer_width_chars(settings.get("receipt_width", "80mm"))
     rule = "-" * width
+    blank = ""
+
+    w_desc, w_qty, w_unit, w_total = _item_columns(width)
+    header = (
+        f"{'Product':<{w_desc}} {'Qty':>{w_qty}} {'Unit':>{w_unit}} {'Total':>{w_total}}"
+    )
+
     lines: list[str] = []
 
-    def center(text: str) -> str:
-        text = text.strip()
-        if len(text) >= width:
-            return text[:width]
-        pad = (width - len(text)) // 2
-        return " " * pad + text
+    # Header block — logo prints separately on thermal; leave a gap in text preview
+    lines.append(blank)
+    lines.append(_center(settings.get("business_name", "My Business").upper(), width))
+    tagline = settings.get("business_tagline", "").strip()
+    if tagline:
+        lines.append(_center(tagline, width))
+    lines.append(blank)
 
-    lines.append(center(settings.get("business_name", "My Business")))
-    lines.append(center(settings.get("business_address", "")))
-    lines.append(center(f"Tel: {settings.get('business_phone', '')}"))
-    lines.append(center(f"GST/HST#: {settings.get('gst_number', '')}"))
-    lines.append(rule)
-    lines.append(f"Invoice: {invoice.invoice_number}")
-    lines.append(f"Date: {invoice.created_at or 'Just now'}")
+    for field in ("business_address", "business_website", "business_phone", "business_email"):
+        value = settings.get(field, "").strip()
+        if value:
+            lines.append(_center(value, width))
+
+    lines.append(blank)
+    lines.append(_center("Tax Receipt", width))
+    lines.append(blank)
+
+    lines.append(_label_value("Order number", invoice.invoice_number, width))
+    lines.append(_label_value("Date", _format_receipt_date(invoice.created_at), width))
+    lines.append(_label_value("Payment method", invoice.payment_method, width))
+
     if invoice.customer_name:
-        lines.append(f"Customer: {invoice.customer_name}")
+        lines.append(blank)
+        lines.append(_label_value("Customer", invoice.customer_name, width))
     if invoice.customer_phone:
-        lines.append(f"Phone: {invoice.customer_phone}")
+        lines.append(_label_value("Phone", invoice.customer_phone, width))
+
+    lines.append(blank)
+    lines.append(rule)
+    lines.append(header)
     lines.append(rule)
 
     for item in items:
-        line_total_str = format_currency(item.line_total)
-        desc = item.description
-        if item.qty > 1:
-            desc = f"{item.qty}x {desc}"
-        max_desc = width - len(line_total_str) - 1
-        if len(desc) > max_desc:
-            desc = desc[: max_desc - 3] + "..."
-        spaces = width - len(desc) - len(line_total_str)
-        lines.append(f"{desc}{' ' * spaces}{line_total_str}")
+        desc_lines = _wrap_text(item.description, w_desc)
+        unit = format_currency(item.unit_price)
+        total = format_currency(item.line_total)
+        first = desc_lines[0]
+        lines.append(f"{first:<{w_desc}} {item.qty:>{w_qty}} {unit:>{w_unit}} {total:>{w_total}}")
+        for extra in desc_lines[1:]:
+            lines.append(f"{extra:<{w_desc}}")
         if item.serial_number:
             lines.append(f"  S/N: {item.serial_number}")
+        lines.append(blank)
 
     lines.append(rule)
-    lines.append(f"{'Subtotal:':<{width - 10}}{format_currency(invoice.subtotal):>10}")
-    if getattr(invoice, "discount_amount", 0) and invoice.discount_amount > 0:
-        disc = format_currency(invoice.discount_amount)
-        if invoice.discount_type == "percent":
-            lines.append(f"{'Discount (' + str(invoice.discount_value).rstrip('0').rstrip('.') + '%):':<{width - 10}}{disc:>10}")
-        else:
-            lines.append(f"{'Discount:':<{width - 10}}{disc:>10}")
+    lines.append(blank)
+
     tax_pct = int(invoice.tax_rate * 100)
-    lines.append(f"{f'HST ({tax_pct}%):':<{width - 10}}{format_currency(invoice.tax_amount):>10}")
-    lines.append(f"{'TOTAL:':<{width - 10}}{format_currency(invoice.total):>10}")
-    lines.append(f"{'Payment:':<{width - 10}}{invoice.payment_method:>10}")
-    lines.append(rule)
-    lines.append(center("Thank you!"))
-    lines.append(center("Please come again"))
-    lines.append("")
 
+    def money_row(label: str, amount: float) -> str:
+        value = format_currency(amount)
+        return f"{label:>{width - len(value) - 1}} {value}"
+
+    lines.append(money_row("Subtotal", invoice.subtotal))
+    if getattr(invoice, "discount_amount", 0) and invoice.discount_amount > 0:
+        if invoice.discount_type == "percent":
+            lines.append(money_row(f"Discount ({invoice.discount_value:g}%)", invoice.discount_amount))
+        else:
+            lines.append(money_row("Discount", invoice.discount_amount))
+    lines.append(money_row(f"HST ({tax_pct}%)", invoice.tax_amount))
+    lines.append(money_row("Total", invoice.total))
+    lines.append(blank)
+
+    if invoice.customer_name:
+        bill = invoice.customer_name
+        if invoice.customer_phone:
+            bill = f"{bill}  {invoice.customer_phone}"
+        half = width // 2
+        lines.append(f"{'Billing':<{half}}{'Shipping':>{half}}")
+        lines.append(f"{bill[:half]:<{half}}{'N/A':>{half}}")
+        lines.append(blank)
+
+    lines.append(_center("Thank You!", width))
+    lines.append(blank)
+
+    footer = settings.get("receipt_footer", "").strip()
+    if footer:
+        for part in footer.split("\n"):
+            for wrapped in _wrap_text(part, width):
+                lines.append(wrapped)
+        lines.append(blank)
+
+    gst = settings.get("gst_number", "").strip()
+    if gst:
+        lines.append(_center(f"HST# {gst}", width))
+
+    lines.append(blank)
+    lines.append(blank)
     return "\n".join(lines)
+
+
+def resolve_logo_path(settings: dict) -> str:
+    from config import DATA_DIR, ASSETS_DIR
+
+    logo_path = settings.get("logo_path", "")
+    if logo_path and os.path.exists(logo_path):
+        return logo_path
+
+    base = os.path.basename(logo_path) if logo_path else ""
+    for candidate in (
+        DATA_DIR / "logo.png",
+        DATA_DIR / "logo.jpg",
+        DATA_DIR / "logo.bmp",
+        DATA_DIR / base if base else DATA_DIR / "logo.png",
+        ASSETS_DIR / "logo.png",
+        ASSETS_DIR / base if base else ASSETS_DIR / "logo.png",
+    ):
+        try:
+            if candidate and os.path.exists(candidate):
+                return str(candidate)
+        except Exception:
+            pass
+    return ""
+
+
+def build_logo_escpos_bytes(logo_path: str, max_width: int = 384) -> bytes:
+    """Convert a logo image to centered ESC/POS raster bytes."""
+    return _pil_logo_escpos_bytes(logo_path, max_width)
+
+
+def _pil_logo_escpos_bytes(logo_path: str, max_width: int = 384) -> bytes:
+    from PIL import Image
+
+    img = Image.open(logo_path).convert("RGBA")
+    background = Image.new("RGBA", img.size, (255, 255, 255, 255))
+    img = Image.alpha_composite(background, img).convert("L")
+
+    w, h = img.size
+    if w > max_width:
+        h = max(1, int(h * max_width / w))
+        w = max_width
+        img = img.resize((w, h), Image.Resampling.LANCZOS)
+
+    img = img.point(lambda p: 0 if p < 160 else 255, mode="1")
+    width_bytes = (w + 7) // 8
+    height = h
+
+    data = bytearray()
+    data.extend(b"\x1b\x61\x01")
+    data.extend(b"\x1d\x76\x30\x00")
+    data.extend(width_bytes.to_bytes(2, "little"))
+    data.extend(height.to_bytes(2, "little"))
+
+    pixels = img.load()
+    for y in range(height):
+        for x_byte in range(width_bytes):
+            byte = 0
+            for bit in range(8):
+                x = x_byte * 8 + bit
+                if x < w and pixels[x, y] == 0:
+                    byte |= 1 << (7 - bit)
+            data.append(byte)
+
+    data.extend(b"\x1b\x61\x00\n\n")
+    return bytes(data)

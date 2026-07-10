@@ -67,6 +67,9 @@ def init_db():
         if cursor.fetchone()[0] == 0:
             for key, value in DEFAULT_SETTINGS.items():
                 cursor.execute('INSERT INTO settings (key, value) VALUES (?, ?)', (key, value))
+        else:
+            for key, value in DEFAULT_SETTINGS.items():
+                cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (key, value))
         
         conn.commit()
         _migrate_schema(conn)
