@@ -36,6 +36,7 @@ DEFAULT_SETTINGS = {
     "smtp_email": "",
     "smtp_password": "",
     "smtp_from_name": "My Business",
+    "setup_complete": "",
 }
 
 def get_db_connection():

@@ -123,7 +123,7 @@ def _build_escpos_bytes(invoice: Invoice, items: list[InvoiceItem], settings: di
             chunks.append(_encode_text(value + "\n"))
 
     chunks.append(_encode_text("\n"))
-    chunks.extend([ESC_BOLD_ON, _encode_text("Tax Receipt\n"), ESC_BOLD_OFF, _encode_text("\n")])
+    chunks.extend([ESC_BOLD_ON, _encode_text("SALES RECEIPT\n"), ESC_BOLD_OFF, _encode_text("\n")])
 
     body = build_receipt_text(invoice, items, settings)
     # Skip duplicate header lines already printed above (logo + business block).
@@ -134,6 +134,7 @@ def _build_escpos_bytes(invoice: Invoice, items: list[InvoiceItem], settings: di
         settings.get("business_website", "").strip(),
         settings.get("business_phone", "").strip(),
         settings.get("business_email", "").strip(),
+        "SALES RECEIPT",
         "Tax Receipt",
     )
     cleaned_lines = []
@@ -206,7 +207,7 @@ def _print_with_escpos(printer_name: str, invoice: Invoice, items: list[InvoiceI
 
     printer.text("\n")
     printer.set(bold=True)
-    printer.text("Tax Receipt\n")
+    printer.text("SALES RECEIPT\n")
     printer.set(bold=False)
     printer.text("\n")
 
@@ -219,6 +220,7 @@ def _print_with_escpos(printer_name: str, invoice: Invoice, items: list[InvoiceI
         settings.get("business_website", "").strip(),
         settings.get("business_phone", "").strip(),
         settings.get("business_email", "").strip(),
+        "SALES RECEIPT",
         "Tax Receipt",
     }
     lines = []
@@ -285,3 +287,36 @@ def print_receipt(invoice: Invoice, items: list[InvoiceItem]) -> tuple[bool, str
 
     detail = errors[0] if errors else "Unknown print error"
     return False, f"Could not print to '{printer_name}'. {detail}"
+
+
+def print_test_receipt() -> tuple[bool, str]:
+    """Print a sample receipt to verify printer setup."""
+    from datetime import datetime
+    from models import Invoice, InvoiceItem
+
+    settings = get_all_settings()
+    invoice = Invoice(
+        id=None,
+        invoice_number="TEST-0001",
+        customer_name="Test Customer",
+        customer_phone="(416) 555-0100",
+        subtotal=29.99,
+        tax_rate=float(settings.get("tax_rate", "0.13")),
+        tax_amount=3.90,
+        total=33.89,
+        payment_method="Cash",
+        notes="",
+        created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        items=[],
+        discount_type="",
+        discount_value=0,
+        discount_amount=0,
+    )
+    items = [
+        InvoiceItem(
+            id=None, invoice_id=None, product_id=None,
+            description="Sample Product", serial_number="",
+            qty=1, unit_price=29.99, line_total=29.99,
+        ),
+    ]
+    return print_receipt(invoice, items)

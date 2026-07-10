@@ -26,6 +26,7 @@ echo Building single-file Executable with PyInstaller...
 pyinstaller --name "RetailInvoice" --onefile --windowed --noconfirm --clean ^
     --add-data "assets;assets" ^
     --add-data "VERSION;." ^
+    --add-data "CHANGELOG.md;." ^
     --collect-all customtkinter ^
     --hidden-import customtkinter ^
     --hidden-import pywin32 ^
@@ -33,6 +34,8 @@ pyinstaller --name "RetailInvoice" --onefile --windowed --noconfirm --clean ^
     --hidden-import escpos ^
     --hidden-import win32print ^
     --hidden-import win32api ^
+    --hidden-import reportlab ^
+    --hidden-import reportlab.pdfgen.canvas ^
     main.py
 
 echo ==============================================

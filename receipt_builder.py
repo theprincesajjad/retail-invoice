@@ -34,13 +34,21 @@ def _label_value(label: str, value: str, width: int) -> str:
     return label + (" " * gap) + value
 
 
+def _double_rule(width: int) -> str:
+    return "=" * width
+
+
+def _single_rule(width: int) -> str:
+    return "-" * width
+
+
 def _format_receipt_date(created_at: str | None) -> str:
     if not created_at:
         return "Just now"
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
         try:
             dt = datetime.strptime(created_at, fmt)
-            formatted = dt.strftime("%B %d, %Y, %I:%M %p")
+            formatted = dt.strftime("%B %d, %Y  ·  %I:%M %p")
             if formatted.startswith("0"):
                 formatted = formatted.replace(" 0", " ", 1)
             return formatted.replace(" 0", " ").replace("AM", "am").replace("PM", "pm")
@@ -80,34 +88,41 @@ def _wrap_text(text: str, width: int) -> list[str]:
 def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dict | None = None) -> str:
     settings = settings or get_all_settings()
     width = get_printer_width_chars(settings.get("receipt_width", "80mm"))
-    rule = "-" * width
+    double = _double_rule(width)
+    single = _single_rule(width)
     blank = ""
 
     w_desc, w_qty, w_unit, w_total = _item_columns(width)
-    header = (
-        f"{'Product':<{w_desc}} {'Qty':>{w_qty}} {'Unit':>{w_unit}} {'Total':>{w_total}}"
-    )
+    header = f"{'Item':<{w_desc}} {'Qty':>{w_qty}} {'Price':>{w_unit}} {'Total':>{w_total}}"
 
     lines: list[str] = []
 
-    # Header block — logo prints separately on thermal; leave a gap in text preview
+    # Decorative top
     lines.append(blank)
-    lines.append(_center(settings.get("business_name", "My Business").upper(), width))
+    lines.append(double)
+    lines.append(blank)
+
+    # Business header
+    biz = settings.get("business_name", "My Business").strip()
+    lines.append(_center(biz.upper(), width))
     tagline = settings.get("business_tagline", "").strip()
     if tagline:
         lines.append(_center(tagline, width))
     lines.append(blank)
 
-    for field in ("business_address", "business_website", "business_phone", "business_email"):
+    for field in ("business_address", "business_phone", "business_website", "business_email"):
         value = settings.get(field, "").strip()
         if value:
             lines.append(_center(value, width))
 
     lines.append(blank)
-    lines.append(_center("Tax Receipt", width))
+    lines.append(_center("SALES RECEIPT", width))
+    lines.append(blank)
+    lines.append(double)
     lines.append(blank)
 
-    lines.append(_label_value("Invoice", invoice.invoice_number, width))
+    # Invoice details
+    lines.append(_label_value("Receipt #", invoice.invoice_number, width))
     lines.append(_label_value("Date", _format_receipt_date(invoice.created_at), width))
 
     if invoice.customer_name or invoice.customer_phone:
@@ -118,10 +133,11 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
             lines.append(_label_value("Phone", invoice.customer_phone, width))
 
     lines.append(blank)
-    lines.append(rule)
+    lines.append(single)
     lines.append(header)
-    lines.append(rule)
+    lines.append(single)
 
+    # Line items
     for item in items:
         desc_lines = _wrap_text(item.description, w_desc)
         unit = format_currency(item.unit_price)
@@ -132,9 +148,8 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
             lines.append(f"{extra:<{w_desc}}")
         if item.serial_number:
             lines.append(f"  S/N: {item.serial_number}")
-        lines.append(blank)
 
-    lines.append(rule)
+    lines.append(single)
     lines.append(blank)
 
     tax_pct = int(invoice.tax_rate * 100)
@@ -149,25 +164,33 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
             lines.append(money_row(f"Discount ({invoice.discount_value:g}%)", invoice.discount_amount))
         else:
             lines.append(money_row("Discount", invoice.discount_amount))
-    lines.append(money_row(f"HST ({tax_pct}%)", invoice.tax_amount))
-    lines.append(money_row("Total", invoice.total))
-    lines.append(_label_value("Payment", invoice.payment_method, width))
+    lines.append(money_row(f"Tax ({tax_pct}%)", invoice.tax_amount))
+    lines.append(blank)
+    lines.append(money_row("TOTAL", invoice.total))
+    lines.append(blank)
+    lines.append(_label_value("Paid by", invoice.payment_method, width))
+    lines.append(blank)
+    lines.append(double)
     lines.append(blank)
 
-    lines.append(_center("Thank You!", width))
+    # Thank you block
+    lines.append(_center("Thank you for your business!", width))
+    lines.append(_center("We appreciate your visit.", width))
     lines.append(blank)
 
     footer = settings.get("receipt_footer", "").strip()
     if footer:
         for part in footer.split("\n"):
             for wrapped in _wrap_text(part, width):
-                lines.append(wrapped)
+                lines.append(_center(wrapped, width))
         lines.append(blank)
 
     gst = settings.get("gst_number", "").strip()
     if gst:
-        lines.append(_center(f"HST# {gst}", width))
+        lines.append(_center(f"HST Reg. {gst}", width))
 
+    lines.append(blank)
+    lines.append(double)
     lines.append(blank)
     lines.append(blank)
     return "\n".join(lines)
