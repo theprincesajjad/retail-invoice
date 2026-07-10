@@ -6,12 +6,13 @@ from .invoice_tab import InvoiceTab
 from .inventory_tab import InventoryTab
 from .reports_tab import ReportsTab
 from .settings_tab import SettingsTab
+from .setup_wizard import needs_setup, show_setup_wizard
 from . import theme as T
 
-TAB_HOME = "Invoice"
-TAB_INVENTORY = "Stock"
-TAB_REPORTS = "Reports"
-TAB_SETTINGS = "Settings"
+TAB_HOME = "New Sale"
+TAB_INVENTORY = "Products"
+TAB_REPORTS = "Sales History"
+TAB_SETTINGS = "Setup"
 
 _TAB_KEYS = {
     TAB_HOME: "F1",
@@ -21,10 +22,10 @@ _TAB_KEYS = {
 }
 
 SHORTCUT_HELP = {
-    TAB_HOME: "Alt+C customer · Alt+S search · Enter add · Alt+D discount · F7 payment · F9 reset · F11 save · F12 print",
-    TAB_INVENTORY: "Alt+N new item · Alt+S search · Tab next field",
-    TAB_REPORTS: "Alt+S search · Alt+P period · Alt+R refresh",
-    TAB_SETTINGS: "Save at bottom when done",
+    TAB_HOME: "F1–F4 switch tabs  ·  F12 complete sale  ·  F9 new sale",
+    TAB_INVENTORY: "Add and manage your product inventory",
+    TAB_REPORTS: "View past sales and reprint receipts",
+    TAB_SETTINGS: "Store details, printer, and email setup",
 }
 
 
@@ -44,8 +45,8 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title("Retail Invoice")
-        self.geometry("1180x740")
-        self.minsize(980, 620)
+        self.geometry("1280x800")
+        self.minsize(1024, 680)
         self.configure(fg_color=T.BG)
         self.after(80, self._maximize_window)
 
@@ -61,6 +62,13 @@ class App(ctk.CTk):
         self.after(150, self.invoice_tab.focus_customer)
         self.shortcut_var.set(SHORTCUT_HELP[TAB_HOME])
 
+        if needs_setup():
+            self.after(300, self._run_setup_wizard)
+
+    def _run_setup_wizard(self):
+        show_setup_wizard(self)
+        self.settings_tab.load_settings()
+
     def _maximize_window(self):
         try:
             if platform.system() == "Windows":
@@ -71,58 +79,61 @@ class App(ctk.CTk):
             pass
 
     def _build_header(self):
-        header = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=48, border_width=0)
+        header = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=56, border_width=0)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_propagate(False)
 
         inner = ctk.CTkFrame(header, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=20, pady=8)
+        inner.pack(fill="both", expand=True, padx=24, pady=10)
 
         left = ctk.CTkFrame(inner, fg_color="transparent")
         left.pack(side="left")
         ctk.CTkLabel(left, text="Retail Invoice", font=T.FONT_TITLE, text_color=T.TEXT).pack(side="left")
-        T.pill(left, f"v{get_app_version()}").pack(side="left", padx=(10, 0))
+        T.pill(left, f"v{get_app_version()}").pack(side="left", padx=(12, 0))
 
         ctk.CTkFrame(inner, fg_color=T.BORDER_LIGHT, height=1, corner_radius=0).pack(side="bottom", fill="x")
 
     def _build_tabs(self):
         shell = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
-        shell.grid(row=1, column=0, sticky="nsew", padx=14, pady=8)
+        shell.grid(row=1, column=0, sticky="nsew", padx=16, pady=10)
         shell.grid_rowconfigure(0, weight=1)
         shell.grid_columnconfigure(0, weight=1)
 
-        self.tabview = ctk.CTkTabview(shell, command=self._on_tab_change, **T.tabview_kwargs())
+        self.tabview = ctk.CTkTabview(
+            shell, command=self._on_tab_change, **T.tabview_kwargs(),
+        )
         self.tabview.grid(row=0, column=0, sticky="nsew")
+        self.tabview._segmented_button.configure(font=T.FONT_MEDIUM, height=44)
 
         for name in (TAB_HOME, TAB_INVENTORY, TAB_REPORTS, TAB_SETTINGS):
             self.tabview.add(name)
 
         self.invoice_tab = InvoiceTab(self.tabview.tab(TAB_HOME))
-        self.invoice_tab.pack(fill="both", expand=True, padx=2, pady=2)
+        self.invoice_tab.pack(fill="both", expand=True, padx=4, pady=4)
 
         self.inventory_tab = InventoryTab(self.tabview.tab(TAB_INVENTORY))
-        self.inventory_tab.pack(fill="both", expand=True, padx=2, pady=2)
+        self.inventory_tab.pack(fill="both", expand=True, padx=4, pady=4)
 
         self.reports_tab = ReportsTab(self.tabview.tab(TAB_REPORTS))
-        self.reports_tab.pack(fill="both", expand=True, padx=2, pady=2)
+        self.reports_tab.pack(fill="both", expand=True, padx=4, pady=4)
 
         self.settings_tab = SettingsTab(self.tabview.tab(TAB_SETTINGS))
-        self.settings_tab.pack(fill="both", expand=True, padx=2, pady=2)
+        self.settings_tab.pack(fill="both", expand=True, padx=4, pady=4)
 
     def _build_status(self):
-        bar = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=32, border_width=0)
+        bar = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=36, border_width=0)
         bar.grid(row=2, column=0, sticky="ew")
         bar.grid_propagate(False)
 
         inner = ctk.CTkFrame(bar, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=20)
+        inner.pack(fill="both", expand=True, padx=24)
 
         ctk.CTkFrame(inner, fg_color=T.BORDER_LIGHT, height=1, corner_radius=0).pack(side="top", fill="x")
 
         row = ctk.CTkFrame(inner, fg_color="transparent")
-        row.pack(fill="x", pady=4)
+        row.pack(fill="x", pady=6)
 
-        self.status_var = ctk.StringVar(value="Ready")
+        self.status_var = ctk.StringVar(value="Ready — go to New Sale to ring up a customer")
         ctk.CTkLabel(row, textvariable=self.status_var, font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY, anchor="w").pack(
             side="left"
         )
