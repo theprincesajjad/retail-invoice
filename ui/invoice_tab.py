@@ -5,7 +5,8 @@ from models import Invoice, InvoiceItem
 from printer import print_receipt
 from utils import format_currency, compute_invoice_totals
 from . import theme as T
-from .dialogs import ask_yes_no, ask_quantity, show_info
+from .dialogs import ask_yes_no, ask_quantity
+from .toast import toast
 from .receipt_viewer import show_receipt_viewer
 
 
@@ -216,7 +217,7 @@ class InvoiceTab(ctk.CTkFrame):
         self._build_action_dock()
 
     def _build_action_dock(self):
-        dock = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=T.RADIUS_LG, border_width=1, border_color=T.BORDER_LIGHT)
+        dock = ctk.CTkFrame(self, **T.raised_card_kwargs())
         dock.grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 4))
 
         inner = ctk.CTkFrame(dock, fg_color="transparent")
@@ -310,7 +311,7 @@ class InvoiceTab(ctk.CTkFrame):
             self.on_search()
 
         if not self.current_search_products:
-            show_info(self.winfo_toplevel(), "Not found", "No products match your search. Try a different name or code.")
+            toast(self, "No products match your search. Try a different name or code.", kind="warning")
             return
 
         idx = 0
@@ -319,12 +320,12 @@ class InvoiceTab(ctk.CTkFrame):
         if selection and selection in values:
             idx = values.index(selection)
         elif len(self.current_search_products) != 1:
-            show_info(self.winfo_toplevel(), "Pick a product", "Please choose a product from the list first.")
+            toast(self, "Choose a product from the list first.", kind="info")
             return
 
         p = self.current_search_products[idx]
         if p.qty <= 0:
-            show_info(self.winfo_toplevel(), "Out of stock", f"'{p.name}' is out of stock.")
+            toast(self, f"'{p.name}' is out of stock.", kind="warning")
             return
 
         qty = ask_quantity(self.winfo_toplevel(), p.name, max_qty=p.qty)
@@ -341,11 +342,12 @@ class InvoiceTab(ctk.CTkFrame):
         self.search_results.configure(values=[])
         self.current_search_products = []
         self.search_entry.focus_set()
+        toast(self, f"Added {qty} × {p.name}", kind="success")
 
     def add_manual_item(self):
         desc = self.man_desc.get().strip()
         if not desc:
-            show_info(self.winfo_toplevel(), "Missing description", "Please enter what you're selling.")
+            toast(self, "Enter what you're selling.", kind="warning")
             self.man_desc.focus_set()
             return
         try:
@@ -353,7 +355,7 @@ class InvoiceTab(ctk.CTkFrame):
             if qty <= 0:
                 raise ValueError
         except ValueError:
-            show_info(self.winfo_toplevel(), "Invalid quantity", "Quantity must be a whole number greater than zero.")
+            toast(self, "Quantity must be a whole number greater than zero.", kind="warning")
             self.man_qty.focus_set()
             return
         try:
@@ -361,7 +363,7 @@ class InvoiceTab(ctk.CTkFrame):
             if price < 0:
                 raise ValueError
         except ValueError:
-            show_info(self.winfo_toplevel(), "Invalid price", "Please enter a valid price.")
+            toast(self, "Enter a valid price.", kind="warning")
             self.man_price.focus_set()
             return
         self.items.append(InvoiceItem(
@@ -374,6 +376,7 @@ class InvoiceTab(ctk.CTkFrame):
         self.man_qty.insert(0, "1")
         self.man_price.delete(0, "end")
         self.man_desc.focus_set()
+        toast(self, f"Added {desc}", kind="success")
 
     def change_qty(self, index: int, delta: int):
         if 0 <= index < len(self.items):
@@ -478,7 +481,7 @@ class InvoiceTab(ctk.CTkFrame):
 
     def preview_receipt(self):
         if not self.items:
-            show_info(self.winfo_toplevel(), "Nothing to preview", "Add at least one item to preview the receipt.")
+            toast(self, "Add at least one item to preview the receipt.", kind="info")
             return
         from datetime import datetime
         invoice = self._build_invoice()
@@ -487,16 +490,27 @@ class InvoiceTab(ctk.CTkFrame):
 
     def save(self, print_rcpt=True):
         if not self.items:
-            show_info(self.winfo_toplevel(), "Nothing to save", "Add at least one item before completing the sale.")
+            toast(self, "Add at least one item before completing the sale.", kind="warning")
             return
 
         invoice = self._build_invoice()
-        action = "complete this sale and print the receipt" if print_rcpt else "save this sale without printing"
-        if not ask_yes_no(
-            self.winfo_toplevel(),
-            "Confirm sale",
-            f"Total: {format_currency(invoice.total)}\n\nAre you ready to {action}?",
-        ):
+        if print_rcpt:
+            confirmed = ask_yes_no(
+                self.winfo_toplevel(),
+                "Complete sale & print?",
+                f"Total: {format_currency(invoice.total)}\n\nThis will save the sale and print the receipt.",
+                confirm_label="Complete & print",
+                cancel_label="Not yet",
+            )
+        else:
+            confirmed = ask_yes_no(
+                self.winfo_toplevel(),
+                "Save this sale?",
+                f"Total: {format_currency(invoice.total)}\n\nSave without printing a receipt.",
+                confirm_label="Save sale",
+                cancel_label="Not yet",
+            )
+        if not confirmed:
             return
 
         try:
@@ -506,13 +520,19 @@ class InvoiceTab(ctk.CTkFrame):
                 from datetime import datetime
                 invoice.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 printed, print_msg = print_receipt(invoice, self.items)
-                msg += " · Receipt printed" if printed else " · Print failed"
-                if not printed:
-                    messagebox.showerror("Print failed", print_msg)
+                if printed:
+                    msg = f"Sale complete · {invoice.invoice_number} · {format_currency(invoice.total)}"
+                    toast(self, msg, kind="success", title="Receipt printed")
                 else:
-                    show_info(self.winfo_toplevel(), "Sale complete!", f"Receipt printed.\n\n{invoice.invoice_number}\nTotal: {format_currency(invoice.total)}")
+                    toast(self, print_msg, kind="error", title="Sale saved, but print failed")
+                    messagebox.showerror("Print failed", print_msg)
             else:
-                show_info(self.winfo_toplevel(), "Sale saved!", f"{invoice.invoice_number}\nTotal: {format_currency(invoice.total)}")
+                toast(
+                    self,
+                    f"{invoice.invoice_number} · {format_currency(invoice.total)}",
+                    kind="success",
+                    title="Sale saved",
+                )
 
             self.winfo_toplevel().set_status(msg)
             self.clear_form(keep_customer=True)
@@ -523,6 +543,7 @@ class InvoiceTab(ctk.CTkFrame):
                 app.reports_tab.load_invoices()
         except Exception as e:
             messagebox.showerror("Save failed", str(e))
+            toast(self, str(e), kind="error", title="Could not save")
 
     def clear_form(self, keep_customer=False):
         if not keep_customer:

@@ -1,27 +1,23 @@
-## Retail Invoice 1.4.0
+## Retail Invoice 1.4.1-beta
 
-**Download `RetailInvoice-1.4.0-Windows.exe` below — double-click to run. No install. No Python. Nothing required to fill in before you can sell.**
+**Beta preview** — download `RetailInvoice-1.4.1-beta-Windows.exe`, double-click, and go. No install. Skip the welcome wizard anytime.
 
-### Welcome wizard (fully optional)
+### Design polish (Emil Kowalski / Apple craft)
 
-On first launch you’ll see a short setup. Enter your store name and tax rate if you like — or click **Skip for now** and start selling immediately. Change anything later in the **Setup** tab.
+This beta applies design-engineering principles to the desktop app:
 
-### What’s new
+- **Non-blocking toasts** — Success and errors appear as soft corner notifications instead of modal popups for everyday actions (add item, save settings, print). Confirmations stay for irreversible or money-moving steps only.
+- **Specific action labels** — “Complete & print”, “Delete product”, “Keep it” instead of generic Yes/No.
+- **Calmer materials** — Refined palette, clearer hierarchy, raised action dock, beta badge in the header.
+- **Destructive actions look destructive** — Delete uses a clear red confirm.
 
-- **Designed for everyone** — Larger text, bigger buttons, plain language, high contrast
-- **New Sale** — Quantity picker, +/− on line items, Preview Receipt, confirm before completing
-- **Beautiful receipts** — Clearer layout, prominent TOTAL, thank-you message
-- **Sales History** — One-click **Today**, plus This week / Monthly / Quarterly / Yearly
-- **Products** — Low-stock warning banner
-- **Setup** — Tax as a percentage (e.g. 13), test print, backup your data
+### Still fully optional setup
 
-### Tabs
-
-**New Sale** · **Products** · **Sales History** · **Setup**
+Welcome wizard remains skippable. Defaults work out of the box.
 
 ### Requirements
 
 - Windows 10 or 11
-- Receipt printer optional (configure in Setup when ready)
+- Receipt printer optional
 
-Full details: [CHANGELOG.md](https://github.com/theprincesajjad/retail-invoice/blob/main/CHANGELOG.md)
+Feedback welcome — this is a beta. Stable channel remains [v1.4.0](https://github.com/theprincesajjad/retail-invoice/releases/tag/v1.4.0).

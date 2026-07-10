@@ -4,6 +4,7 @@ from models import Invoice, InvoiceItem
 from receipt_builder import build_receipt_text
 from database import get_all_settings
 from . import theme as T
+from .toast import toast
 
 
 def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_preview: bool = False):
@@ -64,7 +65,9 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_p
         ok, msg = print_receipt(invoice, items)
         if ok:
             parent.set_status(f"Printed {invoice.invoice_number}")
+            toast(parent, f"Printed {invoice.invoice_number}", kind="success")
         else:
+            toast(parent, msg, kind="error", title="Print failed")
             messagebox.showerror("Print failed", msg)
 
     def do_email():
@@ -82,8 +85,9 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_p
         ok, msg = send_receipt_email(to_addr, invoice, items)
         if ok:
             parent.set_status(msg)
-            messagebox.showinfo("Email sent", msg)
+            toast(parent, msg, kind="success", title="Email sent")
         else:
+            toast(parent, msg, kind="error", title="Email failed")
             messagebox.showerror("Email failed", msg)
 
     footer = ctk.CTkFrame(card, fg_color="transparent")

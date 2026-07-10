@@ -9,12 +9,12 @@ Built so an 85-year-old can complete a sale, and a busy business owner can run t
 ## Download (easiest)
 
 1. Open **[Releases](https://github.com/theprincesajjad/retail-invoice/releases)**
-2. Download **`RetailInvoice-1.4.0-Windows.exe`**
+2. Download the latest **Windows.exe** (stable or beta)
 3. Double-click — no install, no Python, no setup required
 
 That’s it. A welcome wizard may appear; you can fill it in or click **Skip for now** and start selling immediately.
 
-Current version: **1.4.0**
+Current stable: **1.4.0** · Latest beta: **1.4.1-beta**
 
 ---
 

@@ -5,6 +5,7 @@ from models import Product
 from utils import format_currency
 from . import theme as T
 from .dialogs import ask_yes_no
+from .toast import toast
 
 
 class InventoryTab(ctk.CTkFrame):
@@ -126,10 +127,18 @@ class InventoryTab(ctk.CTkFrame):
             ctk.CTkButton(actions, text="Delete", width=76, command=lambda prod=p: self.delete_product(prod), **T.button_kwargs(height=T.BTN_HEIGHT_SM, text_color=T.DANGER)).pack(side="left", padx=3)
 
     def delete_product(self, product: Product):
-        if ask_yes_no(self.winfo_toplevel(), "Delete product?", f"Remove '{product.name}' from your inventory?\n\nThis cannot be undone."):
+        if ask_yes_no(
+            self.winfo_toplevel(),
+            "Delete product?",
+            f"Remove '{product.name}' from your inventory?\n\nThis cannot be undone.",
+            confirm_label="Delete product",
+            cancel_label="Keep it",
+            destructive=True,
+        ):
             delete_product(product.id)
             self.load_products()
             self.winfo_toplevel().set_status(f"Deleted {product.name}")
+            toast(self, f"Removed {product.name}", kind="info")
 
     def show_product_dialog(self, product: Product = None):
         if self._product_dialog is not None:
@@ -237,10 +246,12 @@ class InventoryTab(ctk.CTkFrame):
                 if product:
                     update_product(new_product)
                     parent.set_status(f"Updated {name}")
+                    toast(self, f"Updated {name}", kind="success")
                     close_dialog()
                 else:
                     add_product(new_product)
                     parent.set_status(f"Added {name}")
+                    toast(self, f"Added {name}", kind="success")
                     close_dialog()
                     if add_another:
                         self.after(120, self.show_product_dialog)

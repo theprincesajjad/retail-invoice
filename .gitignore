@@ -27,5 +27,8 @@ Thumbs.db
 .vscode/
 *.swp
 
+# Agent skill copies (lockfile tracked; skill bodies live in .agents/)
+# Keep .agents/ and skills-lock.json so the team shares the same skills
+
 # Dev migration scripts (one-time use)
 refactor_*.py

@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime
 from config import DATA_DIR, DB_PATH
 from . import theme as T
-from .dialogs import show_info
+from .toast import toast
 
 
 class SettingsTab(ctk.CTkFrame):
@@ -189,8 +189,9 @@ class SettingsTab(ctk.CTkFrame):
         from printer import print_test_receipt
         ok, msg = print_test_receipt()
         if ok:
-            show_info(self.winfo_toplevel(), "Test sent!", "A test receipt was sent to your printer. Check that it printed correctly.")
+            toast(self, "Check your printer — a test receipt was sent.", kind="success", title="Test sent")
         else:
+            toast(self, msg, kind="error", title="Print failed")
             messagebox.showerror("Print failed", msg)
 
     def backup_data(self):
@@ -204,9 +205,10 @@ class SettingsTab(ctk.CTkFrame):
         if dest:
             try:
                 shutil.copy2(DB_PATH, dest)
-                show_info(self.winfo_toplevel(), "Backup saved", f"Your data was saved to:\n{dest}")
+                toast(self, dest, kind="success", title="Backup saved")
                 self.winfo_toplevel().set_status("Backup saved")
             except Exception as e:
+                toast(self, str(e), kind="error", title="Backup failed")
                 messagebox.showerror("Backup failed", str(e))
 
     def refresh_printers(self):
@@ -290,6 +292,7 @@ class SettingsTab(ctk.CTkFrame):
             save_setting("receipt_width", self.width_var.get())
             save_setting("receipt_footer", self.receipt_footer.get("1.0", "end").strip())
             self.winfo_toplevel().set_status("Settings saved")
-            show_info(self.winfo_toplevel(), "Settings saved", "Your changes have been saved successfully.")
+            toast(self, "Your changes have been saved.", kind="success", title="Settings saved")
         except Exception as e:
+            toast(self, str(e), kind="error", title="Could not save")
             messagebox.showerror("Error", str(e))

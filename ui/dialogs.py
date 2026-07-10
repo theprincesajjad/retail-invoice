@@ -42,7 +42,16 @@ class FriendlyDialog(ctk.CTkToplevel):
         self.geometry(f"{width}x{h}+{px}+{py}")
 
 
-def ask_yes_no(parent, title: str, message: str) -> bool:
+def ask_yes_no(
+    parent,
+    title: str,
+    message: str,
+    *,
+    confirm_label: str = "Yes, continue",
+    cancel_label: str = "No, go back",
+    destructive: bool = False,
+) -> bool:
+    """Confirm only for meaningful actions. Specific labels beat generic Yes/No."""
     dialog = FriendlyDialog(parent, title, message)
     result = {"value": False}
 
@@ -54,23 +63,35 @@ def ask_yes_no(parent, title: str, message: str) -> bool:
         dialog.destroy()
 
     ctk.CTkButton(
-        dialog._btn_frame, text="No, go back", command=no,
-        **T.button_kwargs(width=140),
+        dialog._btn_frame, text=cancel_label, command=no,
+        **T.button_kwargs(width=150),
     ).pack(side="left")
+
+    confirm_kw = T.danger_button_kwargs(width=180, height=T.BTN_HEIGHT_LG) if destructive else T.success_button_kwargs(width=180)
+    if destructive:
+        confirm_kw = {
+            "fg_color": T.DANGER,
+            "hover_color": "#991B1B",
+            "text_color": "#FFFFFF",
+            "corner_radius": T.RADIUS_SM,
+            "font": T.FONT_MEDIUM,
+            "height": T.BTN_HEIGHT_LG,
+            "border_width": 0,
+            "width": 180,
+        }
     ctk.CTkButton(
-        dialog._btn_frame, text="Yes", command=yes,
-        **T.success_button_kwargs(width=140),
+        dialog._btn_frame, text=confirm_label, command=yes, **confirm_kw,
     ).pack(side="right")
 
     dialog.wait_window()
     return result["value"]
 
 
-def show_info(parent, title: str, message: str):
+def show_info(parent, title: str, message: str, *, button_label: str = "Got it"):
     dialog = FriendlyDialog(parent, title, message)
     ctk.CTkButton(
-        dialog._btn_frame, text="OK", command=dialog.destroy,
-        **T.primary_button_kwargs(width=120),
+        dialog._btn_frame, text=button_label, command=dialog.destroy,
+        **T.primary_button_kwargs(width=140),
     ).pack(side="right")
     dialog.wait_window()
 
