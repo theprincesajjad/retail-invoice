@@ -2,6 +2,26 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.4.1-beta] — 2026-07-10
+
+### Design polish
+
+Applied Emil Kowalski design-engineering and Apple interface craft to the desktop UI:
+
+- Non-blocking toast notifications for everyday feedback (add item, save, print, backup)
+- Confirmations reserved for meaningful actions, with specific button labels
+- Destructive delete confirmation styled clearly
+- Calmer color hierarchy and raised primary panels
+- Beta version badge in the header
+
+### Unchanged
+
+- Skippable welcome wizard
+- Large accessible controls from 1.4.0
+- Beautiful receipt layout
+
+---
+
 ## [1.4.0] — 2026-07-10
 
 ### Designed for everyone

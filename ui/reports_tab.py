@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import calendar
 from . import theme as T
 from .receipt_viewer import show_receipt_viewer
+from .toast import toast
 
 
 class ReportsTab(ctk.CTkFrame):
@@ -248,7 +249,9 @@ class ReportsTab(ctk.CTkFrame):
         ok, msg = print_receipt(invoice, invoice.items)
         if ok:
             self.winfo_toplevel().set_status(f"Printed {invoice.invoice_number}")
+            toast(self, f"Printed {invoice.invoice_number}", kind="success")
         else:
+            toast(self, msg, kind="error", title="Print failed")
             messagebox.showerror("Print failed", msg)
 
     def email_invoice(self, invoice):
@@ -265,6 +268,7 @@ class ReportsTab(ctk.CTkFrame):
         ok, msg = send_receipt_email(to_addr, invoice, invoice.items)
         if ok:
             self.winfo_toplevel().set_status(msg)
-            messagebox.showinfo("Email sent", msg)
+            toast(self, msg, kind="success", title="Email sent")
         else:
+            toast(self, msg, kind="error", title="Email failed")
             messagebox.showerror("Email failed", msg)

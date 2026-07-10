@@ -7,6 +7,7 @@ from .inventory_tab import InventoryTab
 from .reports_tab import ReportsTab
 from .settings_tab import SettingsTab
 from .setup_wizard import needs_setup, show_setup_wizard
+from .toast import ToastHost
 from . import theme as T
 
 TAB_HOME = "New Sale"
@@ -37,7 +38,7 @@ def get_app_version() -> str:
     try:
         return (base / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return "1.4.0"
+        return "1.4.1-beta"
 
 
 class App(ctk.CTk):
@@ -52,6 +53,8 @@ class App(ctk.CTk):
 
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
+
+        self.toast_host = ToastHost(self)
 
         self._build_header()
         self._build_tabs()
@@ -79,17 +82,21 @@ class App(ctk.CTk):
             pass
 
     def _build_header(self):
-        header = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=56, border_width=0)
+        # Material chrome — solid surface with soft edge (Tk approximation of frosted bar)
+        header = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=58, border_width=0)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_propagate(False)
 
         inner = ctk.CTkFrame(header, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=24, pady=10)
+        inner.pack(fill="both", expand=True, padx=24, pady=12)
 
         left = ctk.CTkFrame(inner, fg_color="transparent")
         left.pack(side="left")
         ctk.CTkLabel(left, text="Retail Invoice", font=T.FONT_TITLE, text_color=T.TEXT).pack(side="left")
-        T.pill(left, f"v{get_app_version()}").pack(side="left", padx=(12, 0))
+        version = get_app_version()
+        pill_color = T.WARNING_SOFT if "beta" in version.lower() else T.SURFACE_ALT
+        pill_text = T.WARNING if "beta" in version.lower() else T.TEXT_TERTIARY
+        T.pill(left, f"v{version}", color=pill_color, text_color=pill_text).pack(side="left", padx=(12, 0))
 
         ctk.CTkFrame(inner, fg_color=T.BORDER_LIGHT, height=1, corner_radius=0).pack(side="bottom", fill="x")
 
@@ -198,5 +205,7 @@ class App(ctk.CTk):
         elif tab == TAB_REPORTS:
             self.reports_tab.search_entry.focus_set()
 
-    def set_status(self, message: str):
+    def set_status(self, message: str, *, toast_kind: str | None = None):
         self.status_var.set(message)
+        if toast_kind:
+            self.toast_host.show(message, kind=toast_kind)

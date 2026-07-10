@@ -7,9 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. 1.4.0)"
+        description: "Release version (e.g. 1.4.1-beta)"
         required: true
-        default: "1.4.0"
+        default: "1.4.1-beta"
+      prerelease:
+        description: "Mark as prerelease (beta)"
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: write
@@ -31,12 +36,19 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
+            PRERELEASE="${{ github.event.inputs.prerelease }}"
           else
             VERSION="${GITHUB_REF_NAME#v}"
+            if [[ "$VERSION" == *beta* || "$VERSION" == *rc* || "$VERSION" == *alpha* ]]; then
+              PRERELEASE=true
+            else
+              PRERELEASE=false
+            fi
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Building version $VERSION"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "Building version $VERSION (prerelease=$PRERELEASE)"
 
       - name: Sync VERSION file
         shell: bash
@@ -78,5 +90,5 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: dist/RetailInvoice-${{ steps.version.outputs.version }}-Windows.exe
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           generate_release_notes: false

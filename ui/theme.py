@@ -1,32 +1,37 @@
 import platform
 import customtkinter as ctk
 
-# Warm, welcoming palette — high contrast, easy on aging eyes
-BG = "#F0F4F8"
+# Calm desk — soft depth, frosted panels, precise accent
+# Restraint: one accent, high-contrast text, materials that separate without shouting
+BG = "#EEF2F7"
 BG_DEEP = "#E2E8F0"
 SURFACE = "#FFFFFF"
-SURFACE_ALT = "#F8FAFC"
-SURFACE_GLASS = "#FFFFFF"
+SURFACE_ALT = "#F7F9FC"
+SURFACE_GLASS = "#FBFCFF"
+SURFACE_RAISED = "#FFFFFF"
 BORDER = "#94A3B8"
-BORDER_LIGHT = "#E2E8F0"
+BORDER_LIGHT = "#E8EEF5"
 BORDER_FOCUS = "#2563EB"
+BORDER_SOFT = "#D8E0EA"
 
-TEXT = "#0F172A"
-TEXT_SECONDARY = "#475569"
+TEXT = "#0B1220"
+TEXT_SECONDARY = "#3F4B5F"
 TEXT_TERTIARY = "#64748B"
 
-ACCENT = "#2563EB"
-ACCENT_HOVER = "#1D4ED8"
-ACCENT_SOFT = "#DBEAFE"
+ACCENT = "#1D4ED8"
+ACCENT_HOVER = "#1E40AF"
+ACCENT_SOFT = "#E8F0FE"
 ACCENT_STRIPE = "#3B82F6"
 
-SUCCESS = "#059669"
-SUCCESS_HOVER = "#047857"
+SUCCESS = "#047857"
+SUCCESS_HOVER = "#065F46"
 SUCCESS_SOFT = "#D1FAE5"
-WARNING = "#D97706"
+WARNING = "#B45309"
 WARNING_SOFT = "#FEF3C7"
-DANGER = "#DC2626"
+DANGER = "#B91C1C"
 DANGER_SOFT = "#FEE2E2"
+
+SCRIM = "#0F172A"  # modal dim — applied as solid overlay color with opacity via frame
 
 if platform.system() == "Darwin":
     FONT_FAMILY = "SF Pro Text"
@@ -39,6 +44,7 @@ else:
     FONT_DISPLAY = "Helvetica Neue"
 
 # Accessible sizes — readable without squinting
+# Hierarchy from weight + size together (Apple typography principle)
 FONT = (FONT_FAMILY, 14)
 FONT_MEDIUM = (FONT_FAMILY, 14, "bold")
 FONT_SMALL = (FONT_FAMILY, 13)
@@ -74,6 +80,7 @@ def card_kwargs(**extra):
 
 
 def glass_card_kwargs(**extra):
+    """Raised surface — soft border, no heavy shadow (Tk can't do soft shadows well)."""
     return _merge(
         {
             "fg_color": SURFACE,
@@ -85,10 +92,23 @@ def glass_card_kwargs(**extra):
     )
 
 
+def raised_card_kwargs(**extra):
+    """Slightly stronger separation for primary panels (summary, action dock)."""
+    return _merge(
+        {
+            "fg_color": SURFACE_RAISED,
+            "corner_radius": RADIUS_LG,
+            "border_width": 1,
+            "border_color": BORDER_SOFT,
+        },
+        **extra,
+    )
+
+
 def card_with_stripe(parent, **card_extra):
     outer = ctk.CTkFrame(parent, fg_color="transparent")
-    stripe = ctk.CTkFrame(outer, fg_color=ACCENT_STRIPE, width=4, corner_radius=2)
-    stripe.pack(side="left", fill="y")
+    stripe = ctk.CTkFrame(outer, fg_color=ACCENT_STRIPE, width=3, corner_radius=2)
+    stripe.pack(side="left", fill="y", padx=(0, 0))
     card = ctk.CTkFrame(outer, **glass_card_kwargs(**card_extra))
     card.pack(side="left", fill="both", expand=True)
     return outer, card
