@@ -1,4 +1,4 @@
-"""First-run setup wizard — guides new users through essential configuration."""
+"""First-run setup wizard — optional, skippable at any time."""
 
 from __future__ import annotations
 
@@ -17,13 +17,14 @@ def mark_setup_complete():
 
 
 def show_setup_wizard(parent) -> bool:
-    """Show welcome wizard. Returns True when completed."""
+    """Show welcome wizard. Everything is optional — Skip anytime."""
     dialog = ctk.CTkToplevel(parent)
     dialog.title("Welcome!")
     dialog.configure(fg_color=T.BG)
     dialog.resizable(False, False)
     dialog.transient(parent)
     dialog.grab_set()
+    dialog.protocol("WM_DELETE_WINDOW", lambda: finish(skipped=True))
 
     completed = {"value": False}
     step = {"n": 0}
@@ -54,20 +55,24 @@ def show_setup_wizard(parent) -> bool:
         clear_body()
         title_lbl.configure(text="Welcome to Retail Invoice")
         subtitle_lbl.configure(
-            text="Let's set up your store in just a few steps. "
-                 "This only takes a minute — you can change everything later in Setup."
+            text="A quick optional setup — fill in what you know, or skip and start selling right away. "
+                 "You can change everything later in the Setup tab."
         )
         ctk.CTkLabel(
-            body, text="✓  Ring up sales and print receipts\n"
-                       "✓  Track your inventory\n"
-                       "✓  View sales history and reports",
+            body,
+            text="✓  Ring up sales and print receipts\n"
+                 "✓  Track your inventory\n"
+                 "✓  View sales history and reports\n\n"
+                 "Nothing is required. Skip anytime.",
             font=T.FONT, text_color=T.TEXT, justify="left", anchor="w",
         ).pack(anchor="w", pady=12)
 
     def show_step_1():
         clear_body()
         title_lbl.configure(text="Your store details")
-        subtitle_lbl.configure(text="This information appears at the top of every receipt.")
+        subtitle_lbl.configure(
+            text="Optional — this appears on receipts. Leave blank and edit later in Setup."
+        )
 
         for label, key, placeholder in [
             ("Store name", "business_name", "e.g. Main Street Electronics"),
@@ -85,7 +90,9 @@ def show_setup_wizard(parent) -> bool:
     def show_step_2():
         clear_body()
         title_lbl.configure(text="Tax rate")
-        subtitle_lbl.configure(text="Enter your sales tax percentage. In Ontario, HST is 13%.")
+        subtitle_lbl.configure(
+            text="Optional — defaults to 13% (Ontario HST). Change anytime in Setup."
+        )
 
         T.field_label(body, "Tax rate (%)").pack(anchor="w", pady=(8, 0))
         tax_entry = ctk.CTkEntry(body, placeholder_text="13", **T.entry_kwargs(width=120))
@@ -107,14 +114,14 @@ def show_setup_wizard(parent) -> bool:
 
     def show_step_3():
         clear_body()
-        title_lbl.configure(text="You're all set!")
+        title_lbl.configure(text="You're ready!")
         subtitle_lbl.configure(
-            text="Head to the New Sale tab to ring up your first sale. "
-                 "You can set up your receipt printer anytime in Setup."
+            text="Head to New Sale to ring up a customer. "
+                 "Set up your receipt printer anytime in Setup — nothing else is required."
         )
         ctk.CTkLabel(
             body,
-            text="Tip: The big green button at the bottom saves your sale and prints the receipt.",
+            text="Tip: The big green button at the bottom completes the sale and prints the receipt.",
             font=T.FONT, text_color=T.ACCENT, wraplength=480, justify="left",
         ).pack(anchor="w", pady=12)
 
@@ -125,18 +132,34 @@ def show_setup_wizard(parent) -> bool:
     footer.pack(fill="x", padx=28, pady=(0, 28))
 
     def save_step_data():
+        """Save only non-empty values — never blocks on missing fields."""
         if step["n"] == 1:
             for key in ("business_name", "business_address", "business_phone"):
                 if key in entries:
-                    save_setting(key, entries[key].get().strip())
+                    val = entries[key].get().strip()
+                    if val:
+                        save_setting(key, val)
         elif step["n"] == 2:
-            try:
-                pct = float(entries["tax_pct"].get().strip() or "13")
-                save_setting("tax_rate", str(pct / 100))
-            except ValueError:
-                save_setting("tax_rate", "0.13")
+            raw = entries.get("tax_pct")
+            if raw is not None:
+                text = raw.get().strip()
+                if text:
+                    try:
+                        pct = float(text)
+                        save_setting("tax_rate", str(pct / 100))
+                    except ValueError:
+                        pass
             if "gst_number" in entries:
-                save_setting("gst_number", entries["gst_number"].get().strip())
+                gst = entries["gst_number"].get().strip()
+                if gst:
+                    save_setting("gst_number", gst)
+
+    def finish(skipped: bool = False):
+        if not skipped and step["n"] > 0:
+            save_step_data()
+        mark_setup_complete()
+        completed["value"] = not skipped
+        dialog.destroy()
 
     def next_step():
         if step["n"] > 0 and step["n"] < 3:
@@ -146,10 +169,7 @@ def show_setup_wizard(parent) -> bool:
             steps[step["n"]]()
             update_buttons()
         else:
-            save_step_data()
-            mark_setup_complete()
-            completed["value"] = True
-            dialog.destroy()
+            finish(skipped=False)
 
     def prev_step():
         if step["n"] > 0:
@@ -159,6 +179,13 @@ def show_setup_wizard(parent) -> bool:
 
     back_btn = ctk.CTkButton(footer, text="Back", command=prev_step, **T.button_kwargs(width=100))
     back_btn.pack(side="left")
+
+    skip_btn = ctk.CTkButton(
+        footer, text="Skip for now", command=lambda: finish(skipped=True),
+        **T.button_kwargs(width=130),
+    )
+    skip_btn.pack(side="left", padx=(10, 0))
+
     next_btn = ctk.CTkButton(footer, text="Next", command=next_step, **T.primary_button_kwargs(width=140))
     next_btn.pack(side="right")
 
@@ -167,12 +194,15 @@ def show_setup_wizard(parent) -> bool:
         labels = ["Get started", "Next", "Next", "Start selling"]
         next_btn.configure(text=labels[step["n"]])
         if step["n"] == 3:
-            next_btn.configure(**T.success_button_kwargs(width=160))
+            next_btn.configure(**{**T.success_button_kwargs(width=160), "text": "Start selling"})
+            skip_btn.configure(text="Close")
+        else:
+            skip_btn.configure(text="Skip for now")
 
     update_buttons()
 
     dialog.update_idletasks()
-    w, h = 560, 520
+    w, h = 560, 540
     px = parent.winfo_rootx() + max(0, (parent.winfo_width() - w) // 2)
     py = parent.winfo_rooty() + max(0, (parent.winfo_height() - h) // 2)
     dialog.geometry(f"{w}x{h}+{px}+{py}")

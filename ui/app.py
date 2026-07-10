@@ -37,7 +37,7 @@ def get_app_version() -> str:
     try:
         return (base / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return "1.3.0"
+        return "1.4.0"
 
 
 class App(ctk.CTk):

@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. 1.0.0)"
+        description: "Release version (e.g. 1.4.0)"
         required: true
-        default: "1.0.0"
+        default: "1.4.0"
 
 permissions:
   contents: write
@@ -38,6 +38,10 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
 
+      - name: Sync VERSION file
+        shell: bash
+        run: echo "${{ steps.version.outputs.version }}" > VERSION
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -49,6 +53,7 @@ jobs:
           pyinstaller --name "RetailInvoice" --onefile --windowed --noconfirm --clean
           --add-data "assets;assets"
           --add-data "VERSION;."
+          --add-data "CHANGELOG.md;."
           --collect-all customtkinter
           --hidden-import customtkinter
           --hidden-import pywin32
@@ -70,21 +75,8 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Retail Invoice ${{ steps.version.outputs.version }}
-          body: |
-            ## Retail Invoice System ${{ steps.version.outputs.version }}
-
-            Download **RetailInvoice-${{ steps.version.outputs.version }}-Windows.exe**, run it on Windows — no install required.
-
-            ### What's included
-            - DOS-style green-on-black UI
-            - Full keyboard shortcuts (F1–F4 tabs, Alt+ shortcuts)
-            - Invoice creation, inventory, reports, and reprints
-            - Thermal receipt printing (configure printer in Settings)
-
-            ### Requirements
-            - Windows 10/11
-            - Receipt printer configured in Settings (optional)
+          body_path: RELEASE_NOTES.md
           files: dist/RetailInvoice-${{ steps.version.outputs.version }}-Windows.exe
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
