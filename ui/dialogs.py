@@ -96,6 +96,42 @@ def show_info(parent, title: str, message: str, *, button_label: str = "Got it")
     dialog.wait_window()
 
 
+def ask_payment_method(parent, default: str = "Cash") -> str | None:
+    """Ask Cash or Card before printing. Returns None if cancelled."""
+    dialog = FriendlyDialog(
+        parent,
+        "How did they pay?",
+        "Choose Cash or Card before the receipt is printed.",
+        width=480,
+    )
+    result = {"value": None}
+
+    def choose(method: str):
+        result["value"] = method
+        dialog.destroy()
+
+    def cancel():
+        dialog.destroy()
+
+    ctk.CTkButton(
+        dialog._btn_frame, text="Cancel", command=cancel,
+        **T.button_kwargs(width=120),
+    ).pack(side="left")
+
+    cash_kw = T.success_button_kwargs(width=120) if default == "Cash" else T.button_kwargs(width=120)
+    card_kw = T.success_button_kwargs(width=120) if default == "Card" else T.button_kwargs(width=120)
+
+    ctk.CTkButton(
+        dialog._btn_frame, text="Card", command=lambda: choose("Card"), **card_kw,
+    ).pack(side="right", padx=(10, 0))
+    ctk.CTkButton(
+        dialog._btn_frame, text="Cash", command=lambda: choose("Cash"), **cash_kw,
+    ).pack(side="right")
+
+    dialog.wait_window()
+    return result["value"]
+
+
 def ask_quantity(parent, product_name: str, max_qty: int = 999) -> int | None:
     """Ask how many of a product to add. Returns None if cancelled."""
     dialog = ctk.CTkToplevel(parent)

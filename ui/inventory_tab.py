@@ -41,7 +41,7 @@ class InventoryTab(ctk.CTkFrame):
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
             inner, textvariable=self.search_var,
-            placeholder_text="Name, code, or serial number…", **T.entry_kwargs(300),
+            placeholder_text="Name, code, or details…", **T.entry_kwargs(300),
         )
         self.search_entry.pack(side="left")
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_products())
@@ -64,7 +64,7 @@ class InventoryTab(ctk.CTkFrame):
         self.table_frame = ctk.CTkScrollableFrame(card, fg_color=T.SURFACE, corner_radius=0)
         self.table_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
 
-        self.headers = ["Code", "Product name", "Serial #", "In stock", "Price", ""]
+        self.headers = ["Code", "Product name", "Details", "In stock", "Price", ""]
         self.widths = [100, 260, 140, 80, 100, 160]
 
         header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.SURFACE_ALT, corner_radius=0)
@@ -196,7 +196,7 @@ class InventoryTab(ctk.CTkFrame):
         field_defs = [
             ("Product code (SKU)", "sku", "e.g. 60000"),
             ("Product name", "name", "What is this product called?"),
-            ("Serial number (optional)", "serial_number", "Leave blank if not applicable"),
+            ("Details (optional)", "serial_number", "Specs, S/N, or other text to print on the invoice"),
             ("Price ($)", "price", "0.00"),
             ("How many in stock", "qty", "1"),
         ]
@@ -280,13 +280,13 @@ class InventoryTab(ctk.CTkFrame):
         if is_new:
             ctk.CTkButton(
                 footer,
-                text="Save & add another",
+                text="Save & Next",
                 command=lambda: save(add_another=True),
-                **T.button_kwargs(width=160),
+                **T.button_kwargs(width=140),
             ).pack(side="right", padx=(10, 0))
         ctk.CTkButton(
             footer,
-            text="Save product",
+            text="Save & Close",
             command=lambda: save(add_another=False),
             **T.success_button_kwargs(width=140),
         ).pack(side="right")

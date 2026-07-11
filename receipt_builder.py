@@ -147,7 +147,7 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
         for extra in desc_lines[1:]:
             lines.append(f"{extra:<{w_desc}}")
         if item.serial_number:
-            lines.append(f"  S/N: {item.serial_number}")
+            lines.append(f"  Details: {item.serial_number}")
 
     lines.append(single)
     lines.append(blank)
@@ -169,6 +169,14 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
     lines.append(money_row("TOTAL", invoice.total))
     lines.append(blank)
     lines.append(_label_value("Paid by", invoice.payment_method, width))
+
+    notes = (getattr(invoice, "notes", None) or "").strip()
+    if notes:
+        lines.append(blank)
+        lines.append("Notes:")
+        for note_line in _wrap_text(notes, width):
+            lines.append(note_line)
+
     lines.append(blank)
     lines.append(double)
     lines.append(blank)

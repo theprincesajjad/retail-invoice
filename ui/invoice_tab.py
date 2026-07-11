@@ -5,7 +5,7 @@ from models import Invoice, InvoiceItem
 from printer import print_receipt
 from utils import format_currency, compute_invoice_totals
 from . import theme as T
-from .dialogs import ask_yes_no, ask_quantity
+from .dialogs import ask_yes_no, ask_payment_method
 from .toast import toast
 from .receipt_viewer import show_receipt_viewer
 
@@ -210,8 +210,8 @@ class InvoiceTab(ctk.CTkFrame):
         notes_card.pack(fill="x", pady=(0, 10))
         n_inner = ctk.CTkFrame(notes_card, fg_color="transparent")
         n_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
-        T.field_label(n_inner, "Note", "Only you see this — not printed on receipt").pack(anchor="w")
-        self.notes_entry = ctk.CTkEntry(n_inner, placeholder_text="Optional internal note", **T.entry_kwargs())
+        T.field_label(n_inner, "Sale notes", "Printed on the receipt when filled in").pack(anchor="w")
+        self.notes_entry = ctk.CTkEntry(n_inner, placeholder_text="Optional note for the invoice", **T.entry_kwargs())
         self.notes_entry.pack(fill="x", pady=(6, 0))
 
         self._build_action_dock()
@@ -221,7 +221,7 @@ class InvoiceTab(ctk.CTkFrame):
         dock.grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 4))
 
         inner = ctk.CTkFrame(dock, fg_color="transparent")
-        inner.pack(fill="x", padx=T.PAD_CARD, pady=14)
+        inner.pack(fill="x", padx=T.PAD_CARD, pady=(14, 6))
 
         ctk.CTkButton(
             inner,
@@ -250,6 +250,18 @@ class InvoiceTab(ctk.CTkFrame):
             command=self.clear_form,
             **T.button_kwargs(width=140),
         ).pack(side="right")
+
+        legend = ctk.CTkLabel(
+            dock,
+            text=(
+                "Alt+S Search  ·  Alt+C Name  ·  Alt+P Phone  ·  Alt+M Custom item  ·  "
+                "Alt+A Add custom  ·  Alt+D Discount  ·  F7 Payment  ·  F11 Save  ·  F12 Print  ·  F9 New sale"
+            ),
+            font=T.FONT_CAPTION,
+            text_color=T.TEXT_TERTIARY,
+            anchor="w",
+        )
+        legend.pack(fill="x", padx=T.PAD_CARD, pady=(0, 12))
 
     def _tax_caption(self):
         return f"Tax ({int(self.tax_rate * 100)}%)"
@@ -328,10 +340,7 @@ class InvoiceTab(ctk.CTkFrame):
             toast(self, f"'{p.name}' is out of stock.", kind="warning")
             return
 
-        qty = ask_quantity(self.winfo_toplevel(), p.name, max_qty=p.qty)
-        if qty is None:
-            return
-
+        qty = 1
         self.items.append(InvoiceItem(
             id=None, invoice_id=None, product_id=p.id,
             description=p.name, serial_number=p.serial_number or "",
@@ -342,7 +351,7 @@ class InvoiceTab(ctk.CTkFrame):
         self.search_results.configure(values=[])
         self.current_search_products = []
         self.search_entry.focus_set()
-        toast(self, f"Added {qty} × {p.name}", kind="success")
+        toast(self, f"Added {p.name}", kind="success")
 
     def add_manual_item(self):
         desc = self.man_desc.get().strip()
@@ -419,7 +428,7 @@ class InvoiceTab(ctk.CTkFrame):
                 )
                 desc_text = item.description
                 if item.serial_number:
-                    desc_text += f"\n  S/N: {item.serial_number}"
+                    desc_text += f"\n  Details: {item.serial_number}"
                 ctk.CTkLabel(row, text=desc_text, width=220, anchor="w", font=T.FONT, text_color=T.TEXT, justify="left").pack(
                     side="left", padx=4
                 )
@@ -493,12 +502,21 @@ class InvoiceTab(ctk.CTkFrame):
             toast(self, "Add at least one item before completing the sale.", kind="warning")
             return
 
+        if print_rcpt:
+            payment = ask_payment_method(
+                self.winfo_toplevel(),
+                default=self.payment_var.get(),
+            )
+            if payment is None:
+                return
+            self.payment_var.set(payment)
+
         invoice = self._build_invoice()
         if print_rcpt:
             confirmed = ask_yes_no(
                 self.winfo_toplevel(),
                 "Complete sale & print?",
-                f"Total: {format_currency(invoice.total)}\n\nThis will save the sale and print the receipt.",
+                f"Total: {format_currency(invoice.total)}\nPaid by: {invoice.payment_method}\n\nThis will save the sale and print the receipt.",
                 confirm_label="Complete & print",
                 cancel_label="Not yet",
             )
