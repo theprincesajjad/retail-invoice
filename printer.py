@@ -6,6 +6,7 @@ from models import Invoice, InvoiceItem
 from receipt_builder import (
     build_logo_escpos_bytes,
     build_receipt_text,
+    prepare_logo_image,
     resolve_logo_path,
 )
 
@@ -15,10 +16,14 @@ ESC_BOLD_ON = b"\x1b\x45\x01"
 ESC_BOLD_OFF = b"\x1b\x45\x00"
 ESC_ALIGN_LEFT = b"\x1b\x61\x00"
 ESC_ALIGN_CENTER = b"\x1b\x61\x01"
+ESC_DOUBLE_HEIGHT = b"\x1d\x21\x10"  # taller body text
+ESC_CHAR_NORMAL = b"\x1d\x21\x00"
 ESC_LINE_SPACING_DEFAULT = b"\x1b\x32"
-ESC_LINE_SPACING_42 = b"\x1b\x33\x2a"  # 42 dots — more breathable layout
+ESC_LINE_SPACING_54 = b"\x1b\x33\x36"  # 54 dots — roomier than default
 ESC_FEED_LINES = b"\x1b\x64\x06"
 ESC_CUT = b"\x1d\x56\x00"
+
+LOGO_PRINT_WIDTH = 512
 
 
 def _list_windows_printers() -> list[str]:
@@ -94,36 +99,38 @@ def _encode_text(text: str) -> bytes:
 def _build_escpos_bytes(invoice: Invoice, items: list[InvoiceItem], settings: dict) -> bytes:
     chunks: list[bytes] = [
         ESC_INIT,
-        ESC_LINE_SPACING_42,
+        ESC_LINE_SPACING_54,
     ]
 
     logo_path = resolve_logo_path(settings)
     if logo_path:
         try:
-            chunks.append(build_logo_escpos_bytes(logo_path))
+            chunks.append(build_logo_escpos_bytes(logo_path, max_width=LOGO_PRINT_WIDTH))
         except Exception as e:
             logging.warning(f"Logo skipped: {e}")
 
     business = settings.get("business_name", "My Business").strip().upper()
     chunks.extend([
         ESC_ALIGN_CENTER,
+        ESC_DOUBLE_HEIGHT,
         ESC_BOLD_ON,
         _encode_text(business + "\n"),
         ESC_BOLD_OFF,
+        ESC_CHAR_NORMAL,
     ])
 
     tagline = settings.get("business_tagline", "").strip()
     if tagline:
-        chunks.append(_encode_text(tagline + "\n"))
-    chunks.append(_encode_text("\n"))
+        chunks.append(_encode_text(tagline + "\n\n"))
+    else:
+        chunks.append(_encode_text("\n"))
 
     for field in ("business_address", "business_website", "business_phone", "business_email"):
         value = settings.get(field, "").strip()
         if value:
-            chunks.append(_encode_text(value + "\n"))
+            chunks.append(_encode_text(value + "\n\n"))
 
-    chunks.append(_encode_text("\n"))
-    chunks.extend([ESC_BOLD_ON, _encode_text("SALES RECEIPT\n"), ESC_BOLD_OFF, _encode_text("\n")])
+    chunks.extend([ESC_BOLD_ON, ESC_DOUBLE_HEIGHT, _encode_text("SALES RECEIPT\n"), ESC_CHAR_NORMAL, ESC_BOLD_OFF, _encode_text("\n")])
 
     body = build_receipt_text(invoice, items, settings)
     # Skip duplicate header lines already printed above (logo + business block).
@@ -147,8 +154,9 @@ def _build_escpos_bytes(invoice: Invoice, items: list[InvoiceItem], settings: di
         cleaned_lines.append(line)
     cleaned_body = "\n".join(cleaned_lines).lstrip("\n")
 
-    chunks.extend([ESC_ALIGN_LEFT, _encode_text(cleaned_body)])
+    chunks.extend([ESC_ALIGN_LEFT, ESC_DOUBLE_HEIGHT, _encode_text(cleaned_body)])
     chunks.extend([
+        ESC_CHAR_NORMAL,
         ESC_LINE_SPACING_DEFAULT,
         ESC_FEED_LINES,
         ESC_CUT,
@@ -179,21 +187,22 @@ def _print_with_escpos(printer_name: str, invoice: Invoice, items: list[InvoiceI
     from escpos.printer import Win32Raw
 
     printer = Win32Raw(printer_name)
-    printer._raw(ESC_INIT + ESC_LINE_SPACING_42)
+    printer._raw(ESC_INIT + ESC_LINE_SPACING_54)
 
     logo_path = resolve_logo_path(settings)
     if logo_path:
         try:
             printer.set(align="center")
-            printer.image(logo_path)
+            logo_img = prepare_logo_image(logo_path, max_width=LOGO_PRINT_WIDTH)
+            printer.image(logo_img)
             printer.text("\n")
         except Exception as e:
             logging.warning(f"Logo skipped: {e}")
 
     business = settings.get("business_name", "My Business").strip().upper()
-    printer.set(align="center", bold=True)
+    printer.set(align="center", bold=True, height=2, width=1)
     printer.text(business + "\n")
-    printer.set(bold=False)
+    printer.set(bold=False, height=1, width=1)
 
     tagline = settings.get("business_tagline", "").strip()
     if tagline:
@@ -203,15 +212,14 @@ def _print_with_escpos(printer_name: str, invoice: Invoice, items: list[InvoiceI
     for field in ("business_address", "business_website", "business_phone", "business_email"):
         value = settings.get(field, "").strip()
         if value:
-            printer.text(value + "\n")
+            printer.text(value + "\n\n")
 
-    printer.text("\n")
-    printer.set(bold=True)
+    printer.set(bold=True, height=2, width=1)
     printer.text("SALES RECEIPT\n")
-    printer.set(bold=False)
+    printer.set(bold=False, height=1, width=1)
     printer.text("\n")
 
-    printer.set(align="left")
+    printer.set(align="left", height=2, width=1)
     body = build_receipt_text(invoice, items, settings)
     skip = {
         business,
@@ -229,6 +237,7 @@ def _print_with_escpos(printer_name: str, invoice: Invoice, items: list[InvoiceI
             continue
         lines.append(line)
     printer.text("\n".join(lines).lstrip("\n") + "\n")
+    printer.set(height=1, width=1)
 
     try:
         printer.cut()

@@ -19,20 +19,20 @@ def build_receipt_pdf(invoice: Invoice, items: list[InvoiceItem]) -> bytes:
 
     biz_name = settings.get("business_name", "My Business")
     y = height - inch * 0.75
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(width / 2, y, biz_name)
-    y -= 20
-    c.setFont("Helvetica", 9)
+    y -= 24
+    c.setFont("Helvetica", 11)
     c.drawCentredString(width / 2, y, f"Receipt {invoice.invoice_number}")
-    y -= 30
+    y -= 36
 
-    c.setFont("Courier", 11)
+    c.setFont("Courier", 12)
     for line in text.splitlines():
         if y < inch:
             c.showPage()
-            c.setFont("Courier", 11)
+            c.setFont("Courier", 12)
             y = height - inch
         c.drawString(inch * 0.75, y, line)
-        y -= 14
+        y -= 16
     c.save()
     return buffer.getvalue()
