@@ -2,6 +2,30 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.4.2-beta] — 2026-07-11
+
+### Fixes
+
+- Fixed post-save / post-print crash caused by toast `place(width=…)` (CustomTkinter requires width on the widget constructor/configure).
+
+### New Sale / Products
+
+- Renamed Serial / S/N to **Details** on products, sale lines, and receipts
+- Inventory add skips quantity popup (adds qty 1; adjust with − / +)
+- Sale notes print on the invoice when present
+- Cash / Card payment prompt before complete & print
+- Visible Alt / F-key shortcut legend on New Sale
+- Product dialog buttons: **Save & Close** and **Save & Next**
+
+### Receipt layout
+
+- Larger thermal logo (512 dots)
+- Larger double-height body text and roomier line spacing
+- Blank lines between store contact fields
+- Invoice numbers use `INV-786-xxxx`
+
+---
+
 ## [1.4.1-beta] — 2026-07-10
 
 ### Design polish

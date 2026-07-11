@@ -38,7 +38,7 @@ def get_app_version() -> str:
     try:
         return (base / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return "1.4.1-beta"
+        return "1.4.2-beta"
 
 
 class App(ctk.CTk):
