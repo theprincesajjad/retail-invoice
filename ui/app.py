@@ -23,9 +23,9 @@ _TAB_KEYS = {
 }
 
 SHORTCUT_HELP = {
-    TAB_HOME: "F1–F4 switch tabs  ·  F12 complete sale  ·  F9 new sale",
-    TAB_INVENTORY: "Add and manage your product inventory",
-    TAB_REPORTS: "View past sales and reprint receipts",
+    TAB_HOME: "Alt+S search  ·  Alt+C name  ·  Alt+A add custom  ·  F12 print  ·  F11 save  ·  F9 new sale",
+    TAB_INVENTORY: "Alt+N add product  ·  F1–F4 switch tabs",
+    TAB_REPORTS: "Alt+S search  ·  Alt+P period  ·  Alt+R refresh  ·  F1–F4 switch tabs",
     TAB_SETTINGS: "Store details, printer, and email setup",
 }
 
@@ -38,7 +38,7 @@ def get_app_version() -> str:
     try:
         return (base / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return "1.4.1-beta"
+        return "1.4.2-beta"
 
 
 class App(ctk.CTk):

@@ -1,19 +1,26 @@
-## Retail Invoice 1.4.1-beta
+## Retail Invoice 1.4.2-beta
 
-**Beta preview** — download `RetailInvoice-1.4.1-beta-Windows.exe`, double-click, and go. No install. Skip the welcome wizard anytime.
+**Beta preview** — download `RetailInvoice-1.4.2-beta-Windows.exe`, double-click, and go. No install. Skip the welcome wizard anytime.
 
-### Design polish (Emil Kowalski / Apple craft)
+### Fixes
 
-This beta applies design-engineering principles to the desktop app:
+- **Save / print crash** — Fixed toast layout error (`width`/`height` in `place`) that showed an “Error Output” dialog after completing a sale.
 
-- **Non-blocking toasts** — Success and errors appear as soft corner notifications instead of modal popups for everyday actions (add item, save settings, print). Confirmations stay for irreversible or money-moving steps only.
-- **Specific action labels** — “Complete & print”, “Delete product”, “Keep it” instead of generic Yes/No.
-- **Calmer materials** — Refined palette, clearer hierarchy, raised action dock, beta badge in the header.
-- **Destructive actions look destructive** — Delete uses a clear red confirm.
+### New Sale / Products
 
-### Still fully optional setup
+- **Details** — Serial / S/N relabeled to Details (specs, serial, or other text printed on the invoice).
+- **Faster add-to-sale** — Inventory items add at qty 1 with no popup; adjust with − / + on the row.
+- **Sale notes on invoice** — Notes print on the receipt when filled in.
+- **Cash / Card before print** — Prompt for payment method before completing & printing.
+- **Visible shortcuts** — Alt / function-key legend on New Sale.
+- **Product dialog** — **Save & Close** and **Save & Next**.
 
-Welcome wizard remains skippable. Defaults work out of the box.
+### Receipt layout
+
+- Larger thermal logo (512 dots)
+- Larger double-height receipt text and roomier line spacing
+- Spaced-out store address / phone / website / email
+- Invoice numbers now `INV-786-xxxx`
 
 ### Requirements
 

@@ -46,7 +46,7 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_p
     receipt = build_receipt_text(invoice, items)
     body = ctk.CTkTextbox(
         receipt_frame,
-        font=("Courier New", 13),
+        font=("Courier New", 15),
         fg_color="#FFFEF9",
         text_color=T.TEXT,
         border_width=0,

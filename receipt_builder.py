@@ -114,8 +114,8 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
         value = settings.get(field, "").strip()
         if value:
             lines.append(_center(value, width))
+            lines.append(blank)
 
-    lines.append(blank)
     lines.append(_center("SALES RECEIPT", width))
     lines.append(blank)
     lines.append(double)
@@ -147,7 +147,7 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
         for extra in desc_lines[1:]:
             lines.append(f"{extra:<{w_desc}}")
         if item.serial_number:
-            lines.append(f"  S/N: {item.serial_number}")
+            lines.append(f"  Details: {item.serial_number}")
 
     lines.append(single)
     lines.append(blank)
@@ -169,6 +169,14 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
     lines.append(money_row("TOTAL", invoice.total))
     lines.append(blank)
     lines.append(_label_value("Paid by", invoice.payment_method, width))
+
+    notes = (getattr(invoice, "notes", None) or "").strip()
+    if notes:
+        lines.append(blank)
+        lines.append("Notes:")
+        for note_line in _wrap_text(notes, width):
+            lines.append(note_line)
+
     lines.append(blank)
     lines.append(double)
     lines.append(blank)
@@ -220,12 +228,31 @@ def resolve_logo_path(settings: dict) -> str:
     return ""
 
 
-def build_logo_escpos_bytes(logo_path: str, max_width: int = 384) -> bytes:
-    """Convert a logo image to centered ESC/POS raster bytes."""
+def build_logo_escpos_bytes(logo_path: str, max_width: int = 512) -> bytes:
+    """Convert a logo image to centered ESC/POS raster bytes.
+
+    512 dots fits a typical Epson TM-T20 80mm printable width.
+    """
     return _pil_logo_escpos_bytes(logo_path, max_width)
 
 
-def _pil_logo_escpos_bytes(logo_path: str, max_width: int = 384) -> bytes:
+def prepare_logo_image(logo_path: str, max_width: int = 512):
+    """Load and enlarge logo for thermal print (returns a PIL Image)."""
+    from PIL import Image
+
+    img = Image.open(logo_path).convert("RGBA")
+    background = Image.new("RGBA", img.size, (255, 255, 255, 255))
+    img = Image.alpha_composite(background, img).convert("RGB")
+
+    w, h = img.size
+    if w != max_width:
+        h = max(1, int(h * max_width / w))
+        w = max_width
+        img = img.resize((w, h), Image.Resampling.LANCZOS)
+    return img
+
+
+def _pil_logo_escpos_bytes(logo_path: str, max_width: int = 512) -> bytes:
     from PIL import Image
 
     img = Image.open(logo_path).convert("RGBA")
@@ -233,7 +260,7 @@ def _pil_logo_escpos_bytes(logo_path: str, max_width: int = 384) -> bytes:
     img = Image.alpha_composite(background, img).convert("L")
 
     w, h = img.size
-    if w > max_width:
+    if w != max_width:
         h = max(1, int(h * max_width / w))
         w = max_width
         img = img.resize((w, h), Image.Resampling.LANCZOS)

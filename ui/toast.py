@@ -33,8 +33,10 @@ class ToastHost:
         kind = kind if kind in _STYLES else "info"
         style = _STYLES[kind]
 
+        # Width must be set on the widget (CustomTkinter forbids width/height in place()).
         toast = ctk.CTkFrame(
             self.root,
+            width=280,
             fg_color=style["bg"],
             corner_radius=T.RADIUS_MD,
             border_width=1,
@@ -70,19 +72,26 @@ class ToastHost:
             widget.bind("<Button-1>", lambda e, t=toast: self._dismiss(t))
 
     def _relayout(self):
-        self.root.update_idletasks()
-        # Stack from bottom-right, above the status bar
-        base_y = self.root.winfo_height() - 56
-        right = self.root.winfo_width() - 24
-        for toast in reversed(self._active):
-            toast.update_idletasks()
-            tw = max(toast.winfo_reqwidth(), 280)
-            th = toast.winfo_reqheight()
-            x = max(24, right - tw)
-            y = max(60, base_y - th)
-            toast.place(x=x, y=y, width=tw)
-            toast.lift()
-            base_y = y - 10
+        try:
+            self.root.update_idletasks()
+            # Stack from bottom-right, above the status bar
+            base_y = self.root.winfo_height() - 56
+            right = self.root.winfo_width() - 24
+            for toast in reversed(self._active):
+                if not toast.winfo_exists():
+                    continue
+                toast.update_idletasks()
+                tw = max(toast.winfo_reqwidth(), 280)
+                th = toast.winfo_reqheight()
+                x = max(24, right - tw)
+                y = max(60, base_y - th)
+                toast.configure(width=tw)
+                toast.place(x=x, y=y)
+                toast.lift()
+                base_y = y - 10
+        except Exception:
+            # Never break save/print if a toast fails to position
+            pass
 
     def _dismiss(self, toast: ctk.CTkFrame):
         if toast in self._active:

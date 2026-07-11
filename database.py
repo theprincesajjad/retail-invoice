@@ -1,7 +1,7 @@
 import sqlite3
 from config import get_db_connection, DEFAULT_SETTINGS
 from models import Product, Invoice, InvoiceItem
-from datetime import datetime
+
 
 def init_db():
     with get_db_connection() as conn:
@@ -151,18 +151,23 @@ def search_products(query=""):
         return [Product(**dict(row)) for row in rows]
 
 # Invoice CRUD
+INVOICE_NUMBER_PREFIX = "INV-786"
+
+
 def generate_invoice_number():
-    year = datetime.now().year
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT invoice_number FROM invoices WHERE invoice_number LIKE ? ORDER BY id DESC LIMIT 1", (f"INV-{year}-%",))
+        cursor.execute(
+            "SELECT invoice_number FROM invoices WHERE invoice_number LIKE ? ORDER BY id DESC LIMIT 1",
+            (f"{INVOICE_NUMBER_PREFIX}-%",),
+        )
         row = cursor.fetchone()
         if row:
-            last_num = int(row['invoice_number'].split('-')[-1])
+            last_num = int(row["invoice_number"].split("-")[-1])
             new_num = last_num + 1
         else:
             new_num = 1
-        return f"INV-{year}-{new_num:04d}"
+        return f"{INVOICE_NUMBER_PREFIX}-{new_num:04d}"
 
 def save_invoice(invoice: Invoice, items: list[InvoiceItem]):
     with get_db_connection() as conn:
