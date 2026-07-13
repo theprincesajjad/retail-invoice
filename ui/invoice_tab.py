@@ -19,17 +19,21 @@ class InvoiceTab(ctk.CTkFrame):
         self.items = []
         self.tax_rate = float(get_setting("tax_rate", "0.13"))
         self.discount_type = ctk.StringVar(value="percent")
-        self._tax_caption_prefix = "Tax"
+        self.payment_var = ctk.StringVar(value="Cash")
+        self._tax_caption_prefix = "HST"
+        self.current_search_products = []
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=0, minsize=340)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=0)
+        self.grid_columnconfigure(1, weight=0, minsize=300)
+        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=0)
 
         self._build_customer_row()
-        self._build_main_area()
-        self._build_sidebar()
+        self._build_entry_rows()
+        self._build_sale_body()
+        self._build_action_dock()
         self._bind_manual_enter_keys()
+        self.refresh_items()
 
     def focus_customer(self):
         self.customer_name_entry.focus_set()
@@ -38,249 +42,221 @@ class InvoiceTab(ctk.CTkFrame):
         self.man_desc.focus_set()
 
     def focus_discount(self):
-        self.discount_entry.focus_set()
+        self.discount_pct_entry.focus_set()
+
+    def _labeled_entry(self, parent, label, placeholder, width=None, expand=False):
+        wrap = ctk.CTkFrame(parent, fg_color="transparent")
+        wrap.pack(side="left", fill="x", expand=expand, padx=(0, 12))
+        ctk.CTkLabel(wrap, text=label, font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).pack(anchor="w")
+        kw = T.entry_kwargs(width=width) if width else T.entry_kwargs()
+        entry = ctk.CTkEntry(wrap, placeholder_text=placeholder, **kw)
+        entry.pack(fill="x", pady=(4, 0))
+        return entry
 
     def _build_customer_row(self):
         card = ctk.CTkFrame(self, **T.card_kwargs())
-        card.grid(row=0, column=0, columnspan=2, sticky="ew", padx=4, pady=(4, 6))
-
+        card.grid(row=0, column=0, columnspan=2, sticky="ew", padx=4, pady=(2, 4))
         row = ctk.CTkFrame(card, fg_color="transparent")
-        row.pack(fill="x", padx=T.PAD_CARD, pady=10)
+        row.pack(fill="x", padx=14, pady=10)
 
-        ctk.CTkLabel(row, text="Name", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(side="left", padx=(0, 8))
-        self.customer_name_entry = ctk.CTkEntry(
-            row, placeholder_text="Customer name", **T.entry_kwargs(width=260),
+        self.customer_name_entry = self._labeled_entry(row, "NAME", "Customer name", expand=True)
+        self.customer_phone_entry = self._labeled_entry(row, "PHONE", "(416) 555-0100", width=160)
+        self.customer_email_entry = self._labeled_entry(row, "EMAIL", "name@email.com", expand=True)
+        # last field shouldn't pad right
+        self.customer_email_entry.master.pack_configure(padx=0)
+
+    def _build_entry_rows(self):
+        card = ctk.CTkFrame(self, **T.card_kwargs())
+        card.grid(row=1, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 4))
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="x", padx=14, pady=10)
+
+        # SKU row — search + product picker + ADD
+        sku_row = ctk.CTkFrame(inner, fg_color="transparent")
+        sku_row.pack(fill="x", pady=(0, 8))
+        sku_row.grid_columnconfigure(2, weight=1)
+
+        ctk.CTkLabel(sku_row, text="SKU", font=T.FONT_MEDIUM, text_color=T.TEXT, width=64, anchor="w").grid(
+            row=0, column=0, sticky="w", padx=(0, 8)
         )
-        self.customer_name_entry.pack(side="left", fill="x", expand=True, padx=(0, 20))
-
-        ctk.CTkLabel(row, text="Phone", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(side="left", padx=(0, 8))
-        self.customer_phone_entry = ctk.CTkEntry(
-            row, placeholder_text="(416) 555-0100", **T.entry_kwargs(width=200),
-        )
-        self.customer_phone_entry.pack(side="left", fill="x", expand=True)
-
-    def _build_main_area(self):
-        left = ctk.CTkFrame(self, fg_color="transparent")
-        left.grid(row=1, column=0, sticky="nsew", padx=(4, 8), pady=4)
-        left.grid_rowconfigure(1, weight=1)
-        left.grid_columnconfigure(0, weight=1)
-
-        add_card = ctk.CTkFrame(left, **T.card_kwargs())
-        add_card.grid(row=0, column=0, sticky="ew", pady=(0, 6))
-        add_inner = ctk.CTkFrame(add_card, fg_color="transparent")
-        add_inner.pack(fill="x", padx=T.PAD_CARD, pady=12)
-
-        row1 = ctk.CTkFrame(add_inner, fg_color="transparent")
-        row1.pack(fill="x")
-        row1.grid_columnconfigure(1, weight=1)
-
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
-            row1, textvariable=self.search_var, placeholder_text="Search name or SKU…", **T.entry_compact(),
+            sku_row, textvariable=self.search_var, placeholder_text="Code…", **T.entry_kwargs(width=110),
         )
-        self.search_entry.grid(row=0, column=0, sticky="w", padx=(0, 10))
+        self.search_entry.grid(row=0, column=1, sticky="w", padx=(0, 8))
         self.search_entry.bind("<KeyRelease>", self.on_search)
         self.search_entry.bind("<Return>", self.on_search_enter)
         self.search_entry.bind("<KP_Enter>", self.on_search_enter)
 
         self.search_results = ctk.CTkComboBox(
-            row1, values=[], command=self.on_product_selected, **T.combo_kwargs(720),
+            sku_row, values=[], command=self.on_product_selected, **T.combo_kwargs(width=520),
         )
-        self.search_results.grid(row=0, column=1, sticky="ew", padx=(0, 10))
+        self.search_results.grid(row=0, column=2, sticky="ew", padx=(0, 8))
+        self.search_results.set("SKU — Name — Details — Qty")
 
         ctk.CTkButton(
-            row1,
-            text="Add to sale",
-            width=140,
-            command=self.add_inventory_item,
-            **T.primary_button_kwargs(),
-        ).grid(row=0, column=2, sticky="e")
-        self.current_search_products = []
+            sku_row, text="ADD", width=88, command=self.add_inventory_item, **T.primary_button_kwargs(),
+        ).grid(row=0, column=3, sticky="e")
 
-        details_row = ctk.CTkFrame(add_inner, fg_color="transparent")
-        details_row.pack(fill="x", pady=(8, 0))
-        ctk.CTkLabel(details_row, text="Details", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(side="left", padx=(0, 8))
         self.selected_details_var = ctk.StringVar(value="")
-        self.selected_details_entry = ctk.CTkEntry(
-            details_row,
-            textvariable=self.selected_details_var,
-            placeholder_text="Specs / S/N shown when you pick a product",
-            **T.entry_kwargs(),
+
+        # CUSTOM row
+        custom_row = ctk.CTkFrame(inner, fg_color="transparent")
+        custom_row.pack(fill="x")
+        custom_row.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(custom_row, text="CUSTOM", font=T.FONT_MEDIUM, text_color=T.TEXT, width=64, anchor="w").grid(
+            row=0, column=0, sticky="w", padx=(0, 8)
         )
-        self.selected_details_entry.pack(side="left", fill="x", expand=True)
-
-        row2 = ctk.CTkFrame(add_inner, fg_color="transparent")
-        row2.pack(fill="x", pady=(8, 0))
-        self.man_desc = ctk.CTkEntry(row2, placeholder_text="Custom item name", **T.entry_kwargs(280))
-        self.man_desc.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        self.man_qty = ctk.CTkEntry(row2, placeholder_text="Qty", **T.entry_kwargs(72))
+        self.man_desc = ctk.CTkEntry(custom_row, placeholder_text="Item not in inventory", **T.entry_kwargs())
+        self.man_desc.grid(row=0, column=1, sticky="ew", padx=(0, 8))
+        self.man_qty = ctk.CTkEntry(custom_row, placeholder_text="Qty", **T.entry_kwargs(width=72))
         self.man_qty.insert(0, "1")
-        self.man_qty.pack(side="left", padx=(0, 8))
-        self.man_price = ctk.CTkEntry(row2, placeholder_text="Price", **T.entry_kwargs(100))
-        self.man_price.pack(side="left", padx=(0, 8))
-        ctk.CTkButton(row2, text="Add", width=90, command=self.add_manual_item, **T.button_kwargs()).pack(side="left")
+        self.man_qty.grid(row=0, column=2, sticky="w", padx=(0, 8))
+        self.man_price = ctk.CTkEntry(custom_row, placeholder_text="Price", **T.entry_kwargs(width=100))
+        self.man_price.grid(row=0, column=3, sticky="w", padx=(0, 8))
+        ctk.CTkButton(
+            custom_row, text="ADD", width=88, command=self.add_manual_item, **T.button_kwargs(),
+        ).grid(row=0, column=4, sticky="e")
 
-        lines_card = ctk.CTkFrame(left, **T.card_kwargs())
-        lines_card.grid(row=1, column=0, sticky="nsew")
+    def _build_sale_body(self):
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=4, pady=4)
+        body.grid_columnconfigure(0, weight=1)
+        body.grid_columnconfigure(1, weight=0, minsize=300)
+        body.grid_rowconfigure(0, weight=1)
+
+        # ITEMS IN THIS SALE — primary surface
+        lines_card = ctk.CTkFrame(body, **T.card_kwargs())
+        lines_card.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
         lines_inner = ctk.CTkFrame(lines_card, fg_color="transparent")
-        lines_inner.pack(fill="both", expand=True, padx=T.PAD_CARD, pady=T.PAD_CARD)
+        lines_inner.pack(fill="both", expand=True, padx=14, pady=12)
         lines_inner.grid_rowconfigure(1, weight=1)
         lines_inner.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(lines_inner, text="Items in this sale", font=T.FONT_HEADLINE, text_color=T.TEXT).grid(
-            row=0, column=0, sticky="w", pady=(0, 8)
-        )
+        ctk.CTkLabel(
+            lines_inner, text="ITEMS IN THIS SALE", font=T.FONT_HEADLINE, text_color=T.TEXT,
+        ).grid(row=0, column=0, sticky="w", pady=(0, 8))
 
         self.items_scroll = ctk.CTkScrollableFrame(lines_inner, fg_color=T.SURFACE_ALT, corner_radius=T.RADIUS_SM)
         self.items_scroll.grid(row=1, column=0, sticky="nsew")
 
         hdr = ctk.CTkFrame(self.items_scroll, fg_color="transparent")
         hdr.pack(fill="x", padx=10, pady=(10, 6))
-        for text, w in [("#", 32), ("Item", 220), ("Qty", 100), ("Price", 80), ("Total", 90)]:
+        for text, w in [("#", 32), ("Item", 260), ("Qty", 100), ("Price", 90), ("Total", 90)]:
             ctk.CTkLabel(hdr, text=text, width=w, **T.table_header_kwargs()).pack(side="left", padx=4)
 
         self.item_rows_frame = ctk.CTkFrame(self.items_scroll, fg_color="transparent")
         self.item_rows_frame.pack(fill="both", expand=True, padx=6, pady=(0, 10))
 
-        self.empty_label = ctk.CTkLabel(
-            self.item_rows_frame,
-            text="No items yet — search for a product above to get started",
-            font=T.FONT, text_color=T.TEXT_TERTIARY,
-        )
+        # Right rail — totals, notes, discount (no scroll needed)
+        side = ctk.CTkFrame(body, fg_color="transparent", width=300)
+        side.grid(row=0, column=1, sticky="nsew")
 
-    def _build_sidebar(self):
-        side = ctk.CTkFrame(self, fg_color="transparent", width=340)
-        side.grid(row=1, column=1, sticky="nsew", padx=(0, 4), pady=4)
-        side.grid_rowconfigure(0, weight=1)
-        side.grid_columnconfigure(0, weight=1)
-
-        scroll = ctk.CTkScrollableFrame(side, fg_color="transparent", corner_radius=0)
-        scroll.grid(row=0, column=0, sticky="nsew")
-
-        summary = ctk.CTkFrame(scroll, fg_color=T.ACCENT_SOFT, corner_radius=T.RADIUS_LG, border_width=0)
-        summary.pack(fill="x", pady=(0, 10))
-
+        summary = ctk.CTkFrame(side, fg_color=T.ACCENT_SOFT, corner_radius=T.RADIUS_LG, border_width=0)
+        summary.pack(fill="x", pady=(0, 8))
         s_inner = ctk.CTkFrame(summary, fg_color="transparent")
-        s_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
+        s_inner.pack(fill="x", padx=16, pady=16)
 
         self.subtotal_label = self._summary_row(s_inner, "Subtotal", "$0.00")
         self.discount_summary_label = self._summary_row(s_inner, "Discount", "−$0.00")
         self.tax_label = self._summary_row(s_inner, self._tax_caption(), "$0.00")
 
         ctk.CTkFrame(s_inner, fg_color=T.BORDER, height=1, corner_radius=0).pack(fill="x", pady=12)
-        ctk.CTkLabel(s_inner, text="Total due", font=T.FONT_MEDIUM, text_color=T.TEXT, anchor="w").pack(anchor="w")
+        ctk.CTkLabel(s_inner, text="TOTAL DUE", font=T.FONT_MEDIUM, text_color=T.TEXT, anchor="w").pack(anchor="w")
         self.total_label = ctk.CTkLabel(s_inner, text="$0.00", font=T.FONT_HERO, text_color=T.ACCENT, anchor="e")
-        self.total_label.pack(anchor="e", pady=(4, 0))
+        self.total_label.pack(anchor="e", pady=(2, 0))
 
-        discount_card = ctk.CTkFrame(scroll, **T.card_kwargs())
-        discount_card.pack(fill="x", pady=(0, 10))
-        d_inner = ctk.CTkFrame(discount_card, fg_color="transparent")
-        d_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
-
-        T.field_label(d_inner, "Discount").pack(anchor="w", pady=(0, 8))
-
-        type_row = ctk.CTkFrame(d_inner, fg_color="transparent")
-        type_row.pack(fill="x", pady=(0, 8))
-        ctk.CTkRadioButton(
-            type_row, text="Percent (%)", variable=self.discount_type, value="percent",
-            command=self.refresh_items, font=T.FONT, text_color=T.TEXT,
-            fg_color=T.ACCENT, border_color=T.BORDER, radiobutton_width=20, radiobutton_height=20,
-        ).pack(side="left", padx=(0, 20))
-        ctk.CTkRadioButton(
-            type_row, text="Dollar amount ($)", variable=self.discount_type, value="fixed",
-            command=self.refresh_items, font=T.FONT, text_color=T.TEXT,
-            fg_color=T.ACCENT, border_color=T.BORDER, radiobutton_width=20, radiobutton_height=20,
-        ).pack(side="left")
-
-        self.discount_entry = ctk.CTkEntry(d_inner, placeholder_text="0", **T.entry_kwargs())
-        self.discount_entry.pack(fill="x")
-        self.discount_entry.bind("<KeyRelease>", lambda e: self.refresh_items())
-
-        pay_card = ctk.CTkFrame(scroll, **T.card_kwargs())
-        pay_card.pack(fill="x", pady=(0, 10))
-        p_inner = ctk.CTkFrame(pay_card, fg_color="transparent")
-        p_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
-
-        T.field_label(p_inner, "How did they pay?").pack(anchor="w", pady=(0, 10))
-        self.payment_var = ctk.StringVar(value="Cash")
-        pay_row = ctk.CTkFrame(p_inner, fg_color="transparent")
-        pay_row.pack(fill="x")
-        for method in self.PAYMENT_METHODS:
-            ctk.CTkRadioButton(
-                pay_row, text=method, variable=self.payment_var, value=method,
-                font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
-                radiobutton_width=20, radiobutton_height=20,
-            ).pack(side="left", padx=(0, 16))
-
-        notes_card = ctk.CTkFrame(scroll, **T.card_kwargs())
-        notes_card.pack(fill="x", pady=(0, 10))
+        notes_card = ctk.CTkFrame(side, **T.card_kwargs())
+        notes_card.pack(fill="x", pady=(0, 8))
         n_inner = ctk.CTkFrame(notes_card, fg_color="transparent")
-        n_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
-        T.field_label(n_inner, "Sale notes", "Printed on the receipt when filled in").pack(anchor="w")
-        self.notes_entry = ctk.CTkEntry(n_inner, placeholder_text="Optional note for the invoice", **T.entry_kwargs())
+        n_inner.pack(fill="x", padx=14, pady=12)
+        ctk.CTkLabel(n_inner, text="NOTES", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(anchor="w")
+        self.notes_entry = ctk.CTkEntry(n_inner, placeholder_text="Printed on the invoice", **T.entry_kwargs())
         self.notes_entry.pack(fill="x", pady=(6, 0))
 
-        self._build_action_dock()
+        discount_card = ctk.CTkFrame(side, **T.card_kwargs())
+        discount_card.pack(fill="x")
+        d_inner = ctk.CTkFrame(discount_card, fg_color="transparent")
+        d_inner.pack(fill="x", padx=14, pady=12)
+        ctk.CTkLabel(d_inner, text="DISCOUNT", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(anchor="w")
+
+        d_row = ctk.CTkFrame(d_inner, fg_color="transparent")
+        d_row.pack(fill="x", pady=(8, 0))
+        self.discount_pct_entry = ctk.CTkEntry(d_row, placeholder_text="0", **T.entry_kwargs(width=72))
+        self.discount_pct_entry.pack(side="left")
+        self.discount_pct_entry.bind("<KeyRelease>", self._on_discount_pct)
+        ctk.CTkButton(
+            d_row, text="%", width=40, command=self._apply_pct_discount, **T.button_kwargs(height=T.BTN_HEIGHT),
+        ).pack(side="left", padx=(6, 14))
+        self.discount_amt_entry = ctk.CTkEntry(d_row, placeholder_text="0.00", **T.entry_kwargs(width=88))
+        self.discount_amt_entry.pack(side="left")
+        self.discount_amt_entry.bind("<KeyRelease>", self._on_discount_amt)
+        ctk.CTkButton(
+            d_row, text="$", width=40, command=self._apply_amt_discount, **T.button_kwargs(height=T.BTN_HEIGHT),
+        ).pack(side="left", padx=(6, 0))
+
+        # Compatibility alias used by older helpers
+        self.discount_entry = self.discount_pct_entry
 
     def _build_action_dock(self):
         dock = ctk.CTkFrame(self, **T.raised_card_kwargs())
-        dock.grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 4))
+        dock.grid(row=3, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 2))
 
         inner = ctk.CTkFrame(dock, fg_color="transparent")
-        inner.pack(fill="x", padx=T.PAD_CARD, pady=(14, 6))
+        inner.pack(fill="x", padx=14, pady=(12, 4))
 
         ctk.CTkButton(
-            inner,
-            text="Complete Sale & Print Receipt",
-            command=lambda: self.save(print_rcpt=True),
-            **T.success_button_kwargs(width=280),
-        ).pack(side="left", padx=(0, 10))
-
+            inner, text="COMPLETE  ·  F12", command=lambda: self.save(print_rcpt=True),
+            **T.success_button_kwargs(width=180),
+        ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            inner,
-            text="Preview Receipt",
-            command=self.preview_receipt,
-            **T.button_kwargs(width=150),
-        ).pack(side="left", padx=(0, 10))
-
+            inner, text="PREVIEW  ·  F11", command=self.preview_receipt, **T.button_kwargs(width=140),
+        ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            inner,
-            text="Save Without Printing",
-            command=lambda: self.save(print_rcpt=False),
-            **T.button_kwargs(width=180),
-        ).pack(side="left", padx=(0, 10))
-
+            inner, text="SAVE  ·  F10", command=lambda: self.save(print_rcpt=False), **T.button_kwargs(width=120),
+        ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            inner,
-            text="Start New Sale",
-            command=self.clear_form,
-            **T.button_kwargs(width=140),
+            inner, text="NEW  ·  F1", command=self.clear_form, **T.button_kwargs(width=110),
         ).pack(side="right")
 
         legend = ctk.CTkLabel(
             dock,
-            text=(
-                "Alt+S Search  ·  Alt+C Name  ·  Alt+P Phone  ·  Alt+M Custom item  ·  "
-                "Alt+A Add custom  ·  Alt+D Discount  ·  F7 Payment  ·  F11 Save  ·  F12 Print  ·  F9 New sale"
-            ),
-            font=T.FONT_CAPTION,
-            text_color=T.TEXT_TERTIARY,
-            anchor="w",
+            text="F1 New  ·  F2 Products  ·  F3 Sales  ·  F4 Setup  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print",
+            font=T.FONT_CAPTION, text_color=T.TEXT_TERTIARY, anchor="w",
         )
-        legend.pack(fill="x", padx=T.PAD_CARD, pady=(0, 12))
+        legend.pack(fill="x", padx=14, pady=(0, 10))
 
     def _tax_caption(self):
-        return f"Tax ({int(self.tax_rate * 100)}%)"
+        return f"HST ({int(self.tax_rate * 100)}%)"
 
     def _summary_row(self, parent, label, value):
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", pady=4)
+        row.pack(fill="x", pady=3)
         title = ctk.CTkLabel(row, text=label, **T.label_secondary())
         title.pack(side="left")
         val = ctk.CTkLabel(row, text=value, font=T.FONT_MEDIUM, text_color=T.TEXT, anchor="e")
         val.pack(side="right")
         val._title_label = title
         return val
+
+    def _on_discount_pct(self, event=None):
+        self.discount_type.set("percent")
+        self.refresh_items()
+
+    def _on_discount_amt(self, event=None):
+        self.discount_type.set("fixed")
+        self.refresh_items()
+
+    def _apply_pct_discount(self):
+        self.discount_type.set("percent")
+        self.discount_amt_entry.delete(0, "end")
+        self.refresh_items()
+
+    def _apply_amt_discount(self):
+        self.discount_type.set("fixed")
+        self.discount_pct_entry.delete(0, "end")
+        self.refresh_items()
 
     def _bind_manual_enter_keys(self):
         for widget, nxt in ((self.man_desc, self.man_qty), (self.man_qty, self.man_price)):
@@ -290,8 +266,13 @@ class InvoiceTab(ctk.CTkFrame):
         self.man_price.bind("<KP_Enter>", lambda e: (self.add_manual_item(), "break")[1])
 
     def _get_discount_value(self) -> float:
+        if self.discount_type.get() == "fixed":
+            try:
+                return max(0.0, float(self.discount_amt_entry.get().strip() or "0"))
+            except ValueError:
+                return 0.0
         try:
-            return max(0.0, float(self.discount_entry.get().strip() or "0"))
+            return max(0.0, float(self.discount_pct_entry.get().strip() or "0"))
         except ValueError:
             return 0.0
 
@@ -307,25 +288,27 @@ class InvoiceTab(ctk.CTkFrame):
             self.search_results.configure(values=[])
             self.current_search_products = []
             self.selected_details_var.set("")
+            self.search_results.set("SKU — Name — Details — Qty")
             return
         self.current_search_products = search_products(query)
         values = []
         for p in self.current_search_products:
-            sku = f"{p.sku} · " if p.sku else ""
-            values.append(f"{sku}{p.name}  —  {format_currency(p.price)}  ({p.qty} in stock)")
+            sku = p.sku or "—"
+            details = (p.serial_number or "—").replace("\n", " ")
+            if len(details) > 40:
+                details = details[:37] + "…"
+            values.append(f"{sku} — {p.name} — {details} — {p.qty}")
         self.search_results.configure(values=values)
         if values:
             self.search_results.set(values[0])
             self.on_product_selected(values[0])
         else:
             self.selected_details_var.set("")
+            self.search_results.set("No matches")
 
     def on_product_selected(self, choice=None):
         p = self._selected_search_product()
-        if p is None:
-            self.selected_details_var.set("")
-            return
-        self.selected_details_var.set(p.serial_number or "")
+        self.selected_details_var.set((p.serial_number or "") if p else "")
 
     def _selected_search_product(self):
         if not self.current_search_products:
@@ -503,6 +486,7 @@ class InvoiceTab(ctk.CTkFrame):
             invoice_number=generate_invoice_number(),
             customer_name=self.customer_name_entry.get().strip(),
             customer_phone=self.customer_phone_entry.get().strip(),
+            customer_email=self.customer_email_entry.get().strip(),
             subtotal=subtotal,
             tax_rate=self.tax_rate,
             tax_amount=tax_amount,
@@ -595,14 +579,17 @@ class InvoiceTab(ctk.CTkFrame):
         if not keep_customer:
             self.customer_name_entry.delete(0, "end")
             self.customer_phone_entry.delete(0, "end")
+            self.customer_email_entry.delete(0, "end")
         self.notes_entry.delete(0, "end")
-        self.discount_entry.delete(0, "end")
+        self.discount_pct_entry.delete(0, "end")
+        self.discount_amt_entry.delete(0, "end")
         self.discount_type.set("percent")
         self.items = []
         self.payment_var.set("Cash")
         self.selected_details_var.set("")
         self.search_var.set("")
         self.search_results.configure(values=[])
+        self.search_results.set("SKU — Name — Details — Qty")
         self.current_search_products = []
         self.refresh_items()
         self.focus_customer()

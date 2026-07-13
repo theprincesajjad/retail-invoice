@@ -23,10 +23,10 @@ _TAB_KEYS = {
 }
 
 SHORTCUT_HELP = {
-    TAB_HOME: "Alt+S search  ·  Alt+C name  ·  Alt+A add custom  ·  F12 print  ·  F11 save  ·  F9 new sale",
-    TAB_INVENTORY: "Alt+N add product  ·  F1–F4 switch tabs",
-    TAB_REPORTS: "Alt+S search  ·  Alt+P period  ·  Alt+R refresh  ·  F1–F4 switch tabs",
-    TAB_SETTINGS: "Store details, printer, and email setup",
+    TAB_HOME: "F1 New  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print",
+    TAB_INVENTORY: "Alt+N add product  ·  F5 Save Next  ·  F6 Save Close  ·  F1–F4 tabs",
+    TAB_REPORTS: "Alt+S search  ·  Alt+R refresh  ·  F1–F4 tabs",
+    TAB_SETTINGS: "Store details, printer, and receipt design",
 }
 
 
@@ -38,7 +38,7 @@ def get_app_version() -> str:
     try:
         return (base / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return "1.4.3-beta"
+        return "1.4.4-beta"
 
 
 class App(ctk.CTk):
@@ -82,19 +82,29 @@ class App(ctk.CTk):
             pass
 
     def _build_header(self):
-        # Material chrome — title + tabs on one bar
-        header = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=56, border_width=0)
+        # Wireframe: RETAIL INVOICE | logo + store name | tabs — one chrome bar
+        header = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=64, border_width=0)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_propagate(False)
         header.grid_columnconfigure(1, weight=1)
 
         left = ctk.CTkFrame(header, fg_color="transparent")
-        left.grid(row=0, column=0, sticky="w", padx=(20, 12), pady=8)
-        ctk.CTkLabel(left, text="Retail Invoice", font=T.FONT_TITLE, text_color=T.TEXT).pack(side="left")
+        left.grid(row=0, column=0, sticky="w", padx=(18, 8), pady=8)
+        ctk.CTkLabel(left, text="RETAIL INVOICE", font=T.FONT_TITLE, text_color=T.TEXT).pack(side="left")
         version = get_app_version()
         pill_color = T.WARNING_SOFT if "beta" in version.lower() else T.SURFACE_ALT
         pill_text = T.WARNING if "beta" in version.lower() else T.TEXT_TERTIARY
         T.pill(left, f"v{version}", color=pill_color, text_color=pill_text).pack(side="left", padx=(10, 0))
+
+        brand = ctk.CTkFrame(header, fg_color="transparent")
+        brand.grid(row=0, column=1, sticky="w", padx=8, pady=6)
+        self.header_logo = ctk.CTkLabel(brand, text="", width=40, height=40)
+        self.header_logo.pack(side="left", padx=(0, 10))
+        self.header_business = ctk.CTkLabel(
+            brand, text="", font=T.FONT_HEADLINE, text_color=T.TEXT,
+        )
+        self.header_business.pack(side="left")
+        self.refresh_header_brand()
 
         self.nav = ctk.CTkSegmentedButton(
             header,
@@ -103,19 +113,41 @@ class App(ctk.CTk):
             font=T.FONT_MEDIUM,
             height=36,
             selected_color=T.ACCENT,
-            selected_hover_color=T.ACCENT,
+            selected_hover_color=T.ACCENT_HOVER,
             unselected_color=T.SURFACE_ALT,
             unselected_hover_color=T.BORDER_LIGHT,
             text_color=T.TEXT,
             fg_color=T.SURFACE_ALT,
             corner_radius=T.RADIUS_SM,
         )
-        self.nav.grid(row=0, column=1, sticky="e", padx=(0, 20), pady=8)
+        self.nav.grid(row=0, column=2, sticky="e", padx=(0, 18), pady=8)
         self.nav.set(TAB_HOME)
 
         ctk.CTkFrame(header, fg_color=T.BORDER_LIGHT, height=1, corner_radius=0).grid(
-            row=1, column=0, columnspan=2, sticky="ew"
+            row=1, column=0, columnspan=3, sticky="ew"
         )
+
+    def refresh_header_brand(self):
+        """Load store logo + name into the header (wireframe center brand)."""
+        from database import get_all_settings
+        from receipt_builder import resolve_logo_path
+
+        settings = get_all_settings()
+        name = (settings.get("business_name") or "My Business").strip()
+        self.header_business.configure(text=f"—  {name.upper()}  —")
+
+        logo_path = resolve_logo_path(settings)
+        if logo_path:
+            try:
+                from PIL import Image
+                img = Image.open(logo_path)
+                img.thumbnail((40, 40))
+                self._header_logo_img = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+                self.header_logo.configure(image=self._header_logo_img, text="")
+                return
+            except Exception:
+                pass
+        self.header_logo.configure(image=None, text="◆", font=T.FONT_HEADLINE, text_color=T.ACCENT)
 
     def _on_nav(self, value):
         if hasattr(self, "tabview"):
@@ -195,10 +227,14 @@ class App(ctk.CTk):
         return self.tabview.get()
 
     def _bind_shortcuts(self):
-        self.bind("<F1>", lambda e: self._goto(TAB_HOME))
+        # Wireframe hotkeys
+        self.bind("<F1>", lambda e: self._on_f1_new())
         self.bind("<F2>", lambda e: self._goto(TAB_INVENTORY))
         self.bind("<F3>", lambda e: self._goto(TAB_REPORTS))
         self.bind("<F4>", lambda e: self._goto(TAB_SETTINGS))
+        self.bind("<F10>", lambda e: self._on_invoice(lambda: self.invoice_tab.save(print_rcpt=False)))
+        self.bind("<F11>", lambda e: self._on_invoice(self.invoice_tab.preview_receipt))
+        self.bind("<F12>", lambda e: self._on_invoice(lambda: self.invoice_tab.save(print_rcpt=True)))
 
         self.bind("<Alt-c>", lambda e: self._on_invoice(self.invoice_tab.focus_customer))
         self.bind("<Alt-p>", self._on_alt_p)
@@ -207,11 +243,11 @@ class App(ctk.CTk):
         self.bind("<Alt-a>", lambda e: self._on_invoice(self.invoice_tab.add_manual_item))
         self.bind("<Alt-d>", lambda e: self._on_invoice(self.invoice_tab.focus_discount))
         self.bind("<Alt-r>", lambda e: self._on_reports(self.reports_tab.load_invoices))
-        self.bind("<F7>", lambda e: self._on_invoice(self.invoice_tab.cycle_payment_method))
-        self.bind("<F9>", lambda e: self._on_invoice(self.invoice_tab.clear_form))
-        self.bind("<F11>", lambda e: self._on_invoice(lambda: self.invoice_tab.save(print_rcpt=False)))
-        self.bind("<F12>", lambda e: self._on_invoice(lambda: self.invoice_tab.save(print_rcpt=True)))
         self.bind("<Alt-n>", lambda e: self._on_inventory(self.inventory_tab.show_product_dialog))
+
+    def _on_f1_new(self):
+        self._goto(TAB_HOME)
+        self.invoice_tab.clear_form()
 
     def _goto(self, tab):
         self.tabview.set(tab)

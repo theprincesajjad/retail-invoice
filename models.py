@@ -42,3 +42,4 @@ class Invoice:
     discount_type: str = ""       # "percent" or "fixed"
     discount_value: float = 0.0
     discount_amount: float = 0.0
+    customer_email: str = ""

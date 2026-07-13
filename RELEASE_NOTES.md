@@ -1,30 +1,27 @@
-## Retail Invoice 1.4.3-beta
+## Retail Invoice 1.4.4-beta
 
-**Beta preview** — download `RetailInvoice-1.4.3-beta-Windows.exe`, double-click, and go.
+**Beta preview** — download `RetailInvoice-1.4.4-beta-Windows.exe`, double-click, and go.
 
-### Receipt design (fixed)
+### Wireframe UI
 
-- Receipt text uses normal monospace sizing again so Item / Qty / Price / Total columns stay aligned
-- Customer and phone print on one line each (`Customer: name`)
-- Compact date that no longer wraps mid-word
-- **Setup → Receipt design**: live preview plus toggles for logo, contact fields, notes, GST, and more
-- Title size: Normal (recommended) or Large titles only
-- Header spacing: Compact / Normal / Roomy
+New Sale and Add Product are laid out to match the desk sketch:
 
-### New Sale layout
+**Header** — `RETAIL INVOICE` · store logo + name · tabs inline  
+**Customer** — Name · Phone · Email on one tight row  
+**SKU row** — Code · `SKU — Name — Details — Qty` picker · ADD  
+**Custom row** — Description · Qty · Price · ADD  
+**Items** — large “ITEMS IN THIS SALE” list (main surface)  
+**Right rail** — Subtotal / HST / TOTAL DUE · Notes · Discount `%` / `$`  
+**Actions** — COMPLETE (F12) · PREVIEW (F11) · SAVE (F10) · NEW (F1)
 
-- Name and Phone on one compact row (no “Customer / optional” header)
-- Items list sits higher — less scrolling to see the sale
-- Tabs sit inline with the **Retail Invoice** title
-- Searching by SKU shows a **Details** field you can edit before adding
+**Add Product** — SKU + Price on top · Name · Details · Save Next (F5) · Save Close (F6) · Qty
 
-### Still in this beta channel
+### Hotkeys
 
-- Details field, sale notes on invoice, Cash/Card prompt, Alt shortcuts, `INV-786-xxxx`
+F1 New · F2 Products · F3 Sales · F4 Setup · F10 Save · F11 Preview · F12 Complete + Print
 
 ### Requirements
 
 - Windows 10 or 11
-- Receipt printer optional
 
 Stable channel remains [v1.4.0](https://github.com/theprincesajjad/retail-invoice/releases/tag/v1.4.0).

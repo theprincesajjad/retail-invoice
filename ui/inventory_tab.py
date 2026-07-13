@@ -157,7 +157,7 @@ class InventoryTab(ctk.CTkFrame):
         self._product_dialog = dialog
         dialog.title("Add product" if is_new else "Edit product")
 
-        width, height = 500, 580
+        width, height = 520, 420
         dialog.configure(fg_color=T.BG)
         dialog.resizable(False, False)
         dialog.geometry(f"{width}x{height}")
@@ -172,71 +172,84 @@ class InventoryTab(ctk.CTkFrame):
         dialog.bind("<Destroy>", lambda e: setattr(self, "_product_dialog", None))
 
         card = ctk.CTkFrame(dialog, **T.card_kwargs())
-        card.pack(fill="both", expand=True, padx=20, pady=20)
-
-        header = ctk.CTkFrame(card, fg_color="transparent")
-        header.pack(fill="x", padx=24, pady=(22, 6))
-        ctk.CTkLabel(
-            header,
-            text="Add a new product" if is_new else "Edit product",
-            font=T.FONT_HEADLINE,
-            text_color=T.TEXT,
-        ).pack(anchor="w")
-        ctk.CTkLabel(
-            header,
-            text="Fill in the details below, then press Save",
-            font=T.FONT_SMALL, text_color=T.TEXT_SECONDARY,
-        ).pack(anchor="w", pady=(6, 0))
+        card.pack(fill="both", expand=True, padx=18, pady=18)
 
         body = ctk.CTkFrame(card, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=24, pady=(10, 8))
+        body.pack(fill="both", expand=True, padx=20, pady=(18, 8))
         body.grid_columnconfigure(0, weight=1)
+        body.grid_columnconfigure(1, weight=1)
 
-        entries = {}
-        field_defs = [
-            ("Product code (SKU)", "sku", "e.g. 60000"),
-            ("Product name", "name", "What is this product called?"),
-            ("Details (optional)", "serial_number", "Specs, S/N, or other text to print on the invoice"),
-            ("Price ($)", "price", "0.00"),
-            ("How many in stock", "qty", "1"),
-        ]
+        # Row 1: PRODUCT SKU | PRICE
+        ctk.CTkLabel(body, text="PRODUCT SKU", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        ctk.CTkLabel(body, text="PRICE", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+            row=0, column=1, sticky="w"
+        )
+        sku_entry = ctk.CTkEntry(body, placeholder_text="e.g. 60000", **T.entry_kwargs())
+        sku_entry.grid(row=1, column=0, sticky="ew", padx=(0, 10), pady=(4, 14))
+        price_entry = ctk.CTkEntry(body, placeholder_text="0.00", **T.entry_kwargs())
+        price_entry.grid(row=1, column=1, sticky="ew", pady=(4, 14))
 
-        ordered_entries = []
-        for row, (label, key, placeholder) in enumerate(field_defs):
-            T.field_label(body, label).grid(row=row * 2, column=0, sticky="w", pady=(0, 4))
-            entry = ctk.CTkEntry(body, placeholder_text=placeholder, **T.entry_kwargs(width=360))
-            entry.grid(row=row * 2 + 1, column=0, sticky="ew", pady=(0, 12))
-            entries[key] = entry
-            ordered_entries.append(entry)
+        # Row 2: PRODUCT NAME
+        ctk.CTkLabel(body, text="PRODUCT NAME", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+            row=2, column=0, columnspan=2, sticky="w"
+        )
+        name_entry = ctk.CTkEntry(body, placeholder_text="What is this product called?", **T.entry_kwargs())
+        name_entry.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 14))
 
-        if product:
-            entries["sku"].insert(0, product.sku or "")
-            entries["name"].insert(0, product.name)
-            entries["serial_number"].insert(0, product.serial_number or "")
-            entries["price"].insert(0, str(product.price))
-            entries["qty"].insert(0, str(product.qty))
-        else:
-            entries["qty"].insert(0, "1")
-            entries["price"].insert(0, "0.00")
+        # Row 3: DETAILS
+        ctk.CTkLabel(body, text="DETAILS", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+            row=4, column=0, columnspan=2, sticky="w"
+        )
+        details_entry = ctk.CTkEntry(
+            body, placeholder_text="Specs, S/N, or other text for the invoice", **T.entry_kwargs(),
+        )
+        details_entry.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(4, 8))
+
+        entries = {
+            "sku": sku_entry,
+            "price": price_entry,
+            "name": name_entry,
+            "serial_number": details_entry,
+        }
 
         footer = ctk.CTkFrame(card, fg_color="transparent")
-        footer.pack(fill="x", padx=24, pady=(4, 22))
+        footer.pack(fill="x", padx=20, pady=(4, 18))
+
+        # QTY on the right of the action row (wireframe)
+        qty_wrap = ctk.CTkFrame(footer, fg_color="transparent")
+        qty_wrap.pack(side="right")
+        ctk.CTkLabel(qty_wrap, text="QTY", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).pack(anchor="w")
+        qty_entry = ctk.CTkEntry(qty_wrap, placeholder_text="1", **T.entry_kwargs(width=80))
+        qty_entry.pack(anchor="e", pady=(4, 0))
+        entries["qty"] = qty_entry
+
+        if product:
+            sku_entry.insert(0, product.sku or "")
+            name_entry.insert(0, product.name)
+            details_entry.insert(0, product.serial_number or "")
+            price_entry.insert(0, str(product.price))
+            qty_entry.insert(0, str(product.qty))
+        else:
+            qty_entry.insert(0, "1")
+            price_entry.insert(0, "0.00")
 
         def save(add_another=False):
             try:
-                name = entries["name"].get().strip()
+                name = name_entry.get().strip()
                 if not name:
                     raise ValueError("Product name is required")
-                price = float(entries["price"].get().strip() or "0")
-                qty = int(entries["qty"].get().strip() or "0")
+                price = float(price_entry.get().strip() or "0")
+                qty = int(qty_entry.get().strip() or "0")
                 if qty < 0:
                     raise ValueError("Stock quantity cannot be negative")
 
                 new_product = Product(
                     id=product.id if product else None,
                     name=name,
-                    serial_number=entries["serial_number"].get().strip(),
-                    sku=entries["sku"].get().strip(),
+                    serial_number=details_entry.get().strip(),
+                    sku=sku_entry.get().strip(),
                     price=price,
                     qty=qty,
                     category="",
@@ -260,14 +273,16 @@ class InventoryTab(ctk.CTkFrame):
             except ValueError as e:
                 messagebox.showerror("Please check your entries", str(e), parent=dialog)
 
+        ordered = [sku_entry, price_entry, name_entry, details_entry, qty_entry]
+
         def focus_next(index: int):
-            ordered_entries[(index + 1) % len(ordered_entries)].focus_set()
+            ordered[(index + 1) % len(ordered)].focus_set()
 
         def focus_prev(index: int):
-            ordered_entries[(index - 1) % len(ordered_entries)].focus_set()
+            ordered[(index - 1) % len(ordered)].focus_set()
 
-        for i, entry in enumerate(ordered_entries):
-            if i < len(ordered_entries) - 1:
+        for i, entry in enumerate(ordered):
+            if i < len(ordered) - 1:
                 entry.bind("<Return>", lambda e, idx=i: (focus_next(idx), "break")[1])
                 entry.bind("<KP_Enter>", lambda e, idx=i: (focus_next(idx), "break")[1])
             else:
@@ -276,26 +291,21 @@ class InventoryTab(ctk.CTkFrame):
             entry.bind("<Tab>", lambda e, idx=i: (focus_next(idx), "break")[1])
             entry.bind("<Shift-Tab>", lambda e, idx=i: (focus_prev(idx), "break")[1])
 
-        ctk.CTkButton(footer, text="Cancel", command=close_dialog, **T.button_kwargs(width=110)).pack(side="left")
+        actions = ctk.CTkFrame(footer, fg_color="transparent")
+        actions.pack(side="left")
         if is_new:
             ctk.CTkButton(
-                footer,
-                text="Save & Next",
-                command=lambda: save(add_another=True),
-                **T.button_kwargs(width=140),
-            ).pack(side="right", padx=(10, 0))
+                actions, text="SAVE NEXT  ·  F5", command=lambda: save(add_another=True),
+                **T.button_kwargs(width=150),
+            ).pack(side="left", padx=(0, 10))
         ctk.CTkButton(
-            footer,
-            text="Save & Close",
-            command=lambda: save(add_another=False),
-            **T.success_button_kwargs(width=140),
-        ).pack(side="right")
+            actions, text="SAVE CLOSE  ·  F6", command=lambda: save(add_another=False),
+            **T.success_button_kwargs(width=160),
+        ).pack(side="left")
 
-        def on_ctrl_s(event=None):
-            save(add_another=False)
-            return "break"
-
-        dialog.bind("<Control-s>", on_ctrl_s)
+        dialog.bind("<F5>", lambda e: (save(add_another=True), "break")[1] if is_new else "break")
+        dialog.bind("<F6>", lambda e: (save(add_another=False), "break")[1])
+        dialog.bind("<Control-s>", lambda e: (save(add_another=False), "break")[1])
         dialog.bind("<Escape>", lambda e: (close_dialog(), "break")[1])
 
         parent.update_idletasks()
@@ -310,4 +320,4 @@ class InventoryTab(ctk.CTkFrame):
         dialog.after(50, lambda: dialog.attributes("-topmost", False))
         dialog.grab_set()
         dialog.focus_force()
-        entries["sku"].focus_set()
+        sku_entry.focus_set()
