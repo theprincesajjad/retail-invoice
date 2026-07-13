@@ -109,7 +109,10 @@ def get_all_settings():
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT key, value FROM settings')
-        return {row['key']: row['value'] for row in cursor.fetchall()}
+        stored = {row['key']: row['value'] for row in cursor.fetchall()}
+    merged = dict(DEFAULT_SETTINGS)
+    merged.update(stored)
+    return merged
 
 # Product CRUD
 def add_product(product: Product):

@@ -1,30 +1,30 @@
-## Retail Invoice 1.4.2-beta
+## Retail Invoice 1.4.3-beta
 
-**Beta preview** — download `RetailInvoice-1.4.2-beta-Windows.exe`, double-click, and go. No install. Skip the welcome wizard anytime.
+**Beta preview** — download `RetailInvoice-1.4.3-beta-Windows.exe`, double-click, and go.
 
-### Fixes
+### Receipt design (fixed)
 
-- **Save / print crash** — Fixed toast layout error (`width`/`height` in `place`) that showed an “Error Output” dialog after completing a sale.
+- Receipt text uses normal monospace sizing again so Item / Qty / Price / Total columns stay aligned
+- Customer and phone print on one line each (`Customer: name`)
+- Compact date that no longer wraps mid-word
+- **Setup → Receipt design**: live preview plus toggles for logo, contact fields, notes, GST, and more
+- Title size: Normal (recommended) or Large titles only
+- Header spacing: Compact / Normal / Roomy
 
-### New Sale / Products
+### New Sale layout
 
-- **Details** — Serial / S/N relabeled to Details (specs, serial, or other text printed on the invoice).
-- **Faster add-to-sale** — Inventory items add at qty 1 with no popup; adjust with − / + on the row.
-- **Sale notes on invoice** — Notes print on the receipt when filled in.
-- **Cash / Card before print** — Prompt for payment method before completing & printing.
-- **Visible shortcuts** — Alt / function-key legend on New Sale.
-- **Product dialog** — **Save & Close** and **Save & Next**.
+- Name and Phone on one compact row (no “Customer / optional” header)
+- Items list sits higher — less scrolling to see the sale
+- Tabs sit inline with the **Retail Invoice** title
+- Searching by SKU shows a **Details** field you can edit before adding
 
-### Receipt layout
+### Still in this beta channel
 
-- Larger thermal logo (512 dots)
-- Larger double-height receipt text and roomier line spacing
-- Spaced-out store address / phone / website / email
-- Invoice numbers now `INV-786-xxxx`
+- Details field, sale notes on invoice, Cash/Card prompt, Alt shortcuts, `INV-786-xxxx`
 
 ### Requirements
 
 - Windows 10 or 11
 - Receipt printer optional
 
-Feedback welcome — this is a beta. Stable channel remains [v1.4.0](https://github.com/theprincesajjad/retail-invoice/releases/tag/v1.4.0).
+Stable channel remains [v1.4.0](https://github.com/theprincesajjad/retail-invoice/releases/tag/v1.4.0).

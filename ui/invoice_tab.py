@@ -42,27 +42,22 @@ class InvoiceTab(ctk.CTkFrame):
 
     def _build_customer_row(self):
         card = ctk.CTkFrame(self, **T.card_kwargs())
-        card.grid(row=0, column=0, columnspan=2, sticky="ew", padx=4, pady=(4, 8))
+        card.grid(row=0, column=0, columnspan=2, sticky="ew", padx=4, pady=(4, 6))
 
-        inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
+        row = ctk.CTkFrame(card, fg_color="transparent")
+        row.pack(fill="x", padx=T.PAD_CARD, pady=10)
 
-        T.section_title(inner, "Customer", "Optional — leave blank for walk-in customers").pack(anchor="w", pady=(0, 12))
+        ctk.CTkLabel(row, text="Name", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(side="left", padx=(0, 8))
+        self.customer_name_entry = ctk.CTkEntry(
+            row, placeholder_text="Customer name", **T.entry_kwargs(width=260),
+        )
+        self.customer_name_entry.pack(side="left", fill="x", expand=True, padx=(0, 20))
 
-        fields = ctk.CTkFrame(inner, fg_color="transparent")
-        fields.pack(fill="x")
-
-        name_col = ctk.CTkFrame(fields, fg_color="transparent")
-        name_col.pack(side="left", fill="x", expand=True, padx=(0, 12))
-        T.field_label(name_col, "Name").pack(anchor="w")
-        self.customer_name_entry = ctk.CTkEntry(name_col, placeholder_text="Walk-in customer", **T.entry_kwargs())
-        self.customer_name_entry.pack(fill="x", pady=(6, 0))
-
-        phone_col = ctk.CTkFrame(fields, fg_color="transparent")
-        phone_col.pack(side="left", fill="x", expand=True)
-        T.field_label(phone_col, "Phone").pack(anchor="w")
-        self.customer_phone_entry = ctk.CTkEntry(phone_col, placeholder_text="(416) 555-0100", **T.entry_kwargs())
-        self.customer_phone_entry.pack(fill="x", pady=(6, 0))
+        ctk.CTkLabel(row, text="Phone", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(side="left", padx=(0, 8))
+        self.customer_phone_entry = ctk.CTkEntry(
+            row, placeholder_text="(416) 555-0100", **T.entry_kwargs(width=200),
+        )
+        self.customer_phone_entry.pack(side="left", fill="x", expand=True)
 
     def _build_main_area(self):
         left = ctk.CTkFrame(self, fg_color="transparent")
@@ -71,26 +66,26 @@ class InvoiceTab(ctk.CTkFrame):
         left.grid_columnconfigure(0, weight=1)
 
         add_card = ctk.CTkFrame(left, **T.card_kwargs())
-        add_card.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        add_card.grid(row=0, column=0, sticky="ew", pady=(0, 6))
         add_inner = ctk.CTkFrame(add_card, fg_color="transparent")
-        add_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
-
-        T.section_title(add_inner, "Add a product", "Search by name or product code").pack(anchor="w", pady=(0, 10))
+        add_inner.pack(fill="x", padx=T.PAD_CARD, pady=12)
 
         row1 = ctk.CTkFrame(add_inner, fg_color="transparent")
-        row1.pack(fill="x", pady=(0, 10))
+        row1.pack(fill="x")
         row1.grid_columnconfigure(1, weight=1)
 
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
-            row1, textvariable=self.search_var, placeholder_text="Type to search…", **T.entry_compact(),
+            row1, textvariable=self.search_var, placeholder_text="Search name or SKU…", **T.entry_compact(),
         )
         self.search_entry.grid(row=0, column=0, sticky="w", padx=(0, 10))
         self.search_entry.bind("<KeyRelease>", self.on_search)
         self.search_entry.bind("<Return>", self.on_search_enter)
         self.search_entry.bind("<KP_Enter>", self.on_search_enter)
 
-        self.search_results = ctk.CTkComboBox(row1, values=[], **T.combo_kwargs(720))
+        self.search_results = ctk.CTkComboBox(
+            row1, values=[], command=self.on_product_selected, **T.combo_kwargs(720),
+        )
         self.search_results.grid(row=0, column=1, sticky="ew", padx=(0, 10))
 
         ctk.CTkButton(
@@ -102,10 +97,21 @@ class InvoiceTab(ctk.CTkFrame):
         ).grid(row=0, column=2, sticky="e")
         self.current_search_products = []
 
+        details_row = ctk.CTkFrame(add_inner, fg_color="transparent")
+        details_row.pack(fill="x", pady=(8, 0))
+        ctk.CTkLabel(details_row, text="Details", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(side="left", padx=(0, 8))
+        self.selected_details_var = ctk.StringVar(value="")
+        self.selected_details_entry = ctk.CTkEntry(
+            details_row,
+            textvariable=self.selected_details_var,
+            placeholder_text="Specs / S/N shown when you pick a product",
+            **T.entry_kwargs(),
+        )
+        self.selected_details_entry.pack(side="left", fill="x", expand=True)
+
         row2 = ctk.CTkFrame(add_inner, fg_color="transparent")
-        row2.pack(fill="x", pady=(4, 0))
-        T.field_label(row2, "Custom item", "For items not in your inventory").pack(side="left", padx=(0, 12))
-        self.man_desc = ctk.CTkEntry(row2, placeholder_text="What are you selling?", **T.entry_kwargs(300))
+        row2.pack(fill="x", pady=(8, 0))
+        self.man_desc = ctk.CTkEntry(row2, placeholder_text="Custom item name", **T.entry_kwargs(280))
         self.man_desc.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self.man_qty = ctk.CTkEntry(row2, placeholder_text="Qty", **T.entry_kwargs(72))
         self.man_qty.insert(0, "1")
@@ -300,12 +306,37 @@ class InvoiceTab(ctk.CTkFrame):
         if not query:
             self.search_results.configure(values=[])
             self.current_search_products = []
+            self.selected_details_var.set("")
             return
         self.current_search_products = search_products(query)
-        values = [f"{p.name}  —  {format_currency(p.price)}  ({p.qty} in stock)" for p in self.current_search_products]
+        values = []
+        for p in self.current_search_products:
+            sku = f"{p.sku} · " if p.sku else ""
+            values.append(f"{sku}{p.name}  —  {format_currency(p.price)}  ({p.qty} in stock)")
         self.search_results.configure(values=values)
         if values:
             self.search_results.set(values[0])
+            self.on_product_selected(values[0])
+        else:
+            self.selected_details_var.set("")
+
+    def on_product_selected(self, choice=None):
+        p = self._selected_search_product()
+        if p is None:
+            self.selected_details_var.set("")
+            return
+        self.selected_details_var.set(p.serial_number or "")
+
+    def _selected_search_product(self):
+        if not self.current_search_products:
+            return None
+        selection = self.search_results.get()
+        values = self.search_results.cget("values") or []
+        if selection and selection in values:
+            return self.current_search_products[values.index(selection)]
+        if len(self.current_search_products) == 1:
+            return self.current_search_products[0]
+        return None
 
     def on_search_enter(self, event=None):
         query = self.search_var.get().strip()
@@ -326,30 +357,27 @@ class InvoiceTab(ctk.CTkFrame):
             toast(self, "No products match your search. Try a different name or code.", kind="warning")
             return
 
-        idx = 0
-        selection = self.search_results.get()
-        values = self.search_results.cget("values") or []
-        if selection and selection in values:
-            idx = values.index(selection)
-        elif len(self.current_search_products) != 1:
+        p = self._selected_search_product()
+        if p is None:
             toast(self, "Choose a product from the list first.", kind="info")
             return
 
-        p = self.current_search_products[idx]
         if p.qty <= 0:
             toast(self, f"'{p.name}' is out of stock.", kind="warning")
             return
 
+        details = self.selected_details_var.get().strip() or (p.serial_number or "")
         qty = 1
         self.items.append(InvoiceItem(
             id=None, invoice_id=None, product_id=p.id,
-            description=p.name, serial_number=p.serial_number or "",
+            description=p.name, serial_number=details,
             qty=qty, unit_price=p.price, line_total=qty * p.price,
         ))
         self.refresh_items()
         self.search_var.set("")
         self.search_results.configure(values=[])
         self.current_search_products = []
+        self.selected_details_var.set("")
         self.search_entry.focus_set()
         toast(self, f"Added {p.name}", kind="success")
 
@@ -572,5 +600,9 @@ class InvoiceTab(ctk.CTkFrame):
         self.discount_type.set("percent")
         self.items = []
         self.payment_var.set("Cash")
+        self.selected_details_var.set("")
+        self.search_var.set("")
+        self.search_results.configure(values=[])
+        self.current_search_products = []
         self.refresh_items()
         self.focus_customer()

@@ -93,6 +93,7 @@ class SettingsTab(ctk.CTkFrame):
         for val, label in (("80mm", "Standard (80 mm)"), ("58mm", "Small (58 mm)")):
             ctk.CTkRadioButton(
                 w_row, text=label, variable=self.width_var, value=val,
+                command=self.refresh_receipt_preview,
                 font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
                 radiobutton_width=20, radiobutton_height=20,
             ).pack(side="left", padx=(0, 20))
@@ -102,8 +103,103 @@ class SettingsTab(ctk.CTkFrame):
             **T.primary_button_kwargs(width=180),
         ).pack(anchor="w", pady=(4, 0))
 
+        design_frame = ctk.CTkFrame(grid, **T.card_kwargs())
+        design_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=8)
+        d_inner = ctk.CTkFrame(design_frame, fg_color="transparent")
+        d_inner.pack(fill="both", expand=True, padx=T.PAD_CARD, pady=T.PAD_CARD)
+        T.section_title(
+            d_inner,
+            "Receipt design",
+            "Preview how receipts look and choose what to print",
+        ).pack(anchor="w", pady=(0, 12))
+
+        opts = ctk.CTkFrame(d_inner, fg_color="transparent")
+        opts.pack(fill="x")
+        opts.grid_columnconfigure(0, weight=1)
+        opts.grid_columnconfigure(1, weight=1)
+
+        left_opts = ctk.CTkFrame(opts, fg_color="transparent")
+        left_opts.grid(row=0, column=0, sticky="nw", padx=(0, 16))
+        right_opts = ctk.CTkFrame(opts, fg_color="transparent")
+        right_opts.grid(row=0, column=1, sticky="nw")
+
+        T.field_label(left_opts, "Title size").pack(anchor="w", pady=(0, 6))
+        self.font_size_var = ctk.StringVar(value="normal")
+        font_row = ctk.CTkFrame(left_opts, fg_color="transparent")
+        font_row.pack(anchor="w", pady=(0, 12))
+        for val, label in (("normal", "Normal (recommended)"), ("large", "Large titles only")):
+            ctk.CTkRadioButton(
+                font_row, text=label, variable=self.font_size_var, value=val,
+                command=self.refresh_receipt_preview,
+                font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
+                radiobutton_width=20, radiobutton_height=20,
+            ).pack(side="left", padx=(0, 16))
+
+        T.field_label(left_opts, "Header spacing").pack(anchor="w", pady=(0, 6))
+        self.header_spacing_var = ctk.StringVar(value="normal")
+        space_row = ctk.CTkFrame(left_opts, fg_color="transparent")
+        space_row.pack(anchor="w", pady=(0, 12))
+        for val, label in (("compact", "Compact"), ("normal", "Normal"), ("roomy", "Roomy")):
+            ctk.CTkRadioButton(
+                space_row, text=label, variable=self.header_spacing_var, value=val,
+                command=self.refresh_receipt_preview,
+                font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
+                radiobutton_width=20, radiobutton_height=20,
+            ).pack(side="left", padx=(0, 14))
+
+        T.field_label(right_opts, "Show on receipt").pack(anchor="w", pady=(0, 8))
+        self.design_toggles: dict[str, ctk.BooleanVar] = {}
+        toggle_defs = [
+            ("receipt_show_logo", "Logo"),
+            ("receipt_show_business_name", "Store name"),
+            ("receipt_show_tagline", "Tagline"),
+            ("receipt_show_address", "Address"),
+            ("receipt_show_phone", "Phone"),
+            ("receipt_show_website", "Website"),
+            ("receipt_show_email", "Email"),
+            ("receipt_show_customer", "Customer / phone"),
+            ("receipt_show_details", "Item details"),
+            ("receipt_show_notes", "Sale notes"),
+            ("receipt_show_thanks", "Thank-you line"),
+            ("receipt_show_footer", "Return policy"),
+            ("receipt_show_gst", "HST / GST number"),
+        ]
+        toggle_grid = ctk.CTkFrame(right_opts, fg_color="transparent")
+        toggle_grid.pack(anchor="w")
+        for i, (key, label) in enumerate(toggle_defs):
+            var = ctk.BooleanVar(value=True)
+            self.design_toggles[key] = var
+            ctk.CTkCheckBox(
+                toggle_grid, text=label, variable=var, command=self.refresh_receipt_preview,
+                font=T.FONT_SMALL, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
+                checkbox_width=18, checkbox_height=18,
+            ).grid(row=i // 3, column=i % 3, sticky="w", padx=(0, 18), pady=3)
+
+        preview_row = ctk.CTkFrame(d_inner, fg_color="transparent")
+        preview_row.pack(fill="both", expand=True, pady=(16, 0))
+        T.field_label(preview_row, "Live preview").pack(anchor="w", pady=(0, 6))
+        self.receipt_preview = ctk.CTkTextbox(
+            preview_row,
+            height=320,
+            fg_color=T.SURFACE_ALT,
+            border_color=T.BORDER,
+            corner_radius=T.RADIUS_SM,
+            font=("Courier New", 12),
+            text_color=T.TEXT,
+            wrap="none",
+        )
+        self.receipt_preview.pack(fill="both", expand=True)
+        self.receipt_preview.configure(state="disabled")
+
+        btn_row = ctk.CTkFrame(d_inner, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(10, 0))
+        ctk.CTkButton(
+            btn_row, text="Refresh preview", command=self.refresh_receipt_preview,
+            **T.button_kwargs(width=150),
+        ).pack(side="left")
+
         email_frame = ctk.CTkFrame(grid, **T.card_kwargs())
-        email_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=8)
+        email_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=8)
         em_inner = ctk.CTkFrame(email_frame, fg_color="transparent")
         em_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
         T.section_title(
@@ -149,7 +245,7 @@ class SettingsTab(ctk.CTkFrame):
             self.entries[key] = e
 
         backup_frame = ctk.CTkFrame(grid, **T.card_kwargs())
-        backup_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=8)
+        backup_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=8)
         bk_inner = ctk.CTkFrame(backup_frame, fg_color="transparent")
         bk_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
         T.section_title(bk_inner, "Backup your data", "Save a copy of your sales and inventory to a safe place").pack(anchor="w", pady=(0, 12))
@@ -160,6 +256,38 @@ class SettingsTab(ctk.CTkFrame):
         ctk.CTkButton(save_f, text="Save all settings", command=self.save_settings, **T.success_button_kwargs(width=200)).pack()
 
         self.refresh_printers()
+
+        self.refresh_printers()
+        self.after(100, self.refresh_receipt_preview)
+
+    def _collect_design_settings(self) -> dict:
+        """Merge form values into a settings dict for live preview."""
+        settings = get_all_settings()
+        for key, entry in self.entries.items():
+            settings[key] = entry.get().strip()
+        settings["receipt_width"] = self.width_var.get()
+        settings["receipt_font_size"] = self.font_size_var.get()
+        settings["receipt_header_spacing"] = self.header_spacing_var.get()
+        settings["receipt_footer"] = self.receipt_footer.get("1.0", "end").strip()
+        try:
+            pct = float(self.tax_pct_entry.get().strip() or "13")
+            settings["tax_rate"] = str(pct / 100)
+        except ValueError:
+            pass
+        for key, var in self.design_toggles.items():
+            settings[key] = "1" if var.get() else "0"
+        return settings
+
+    def refresh_receipt_preview(self, *_args):
+        from receipt_builder import build_receipt_text, sample_receipt_invoice
+
+        settings = self._collect_design_settings()
+        invoice, items = sample_receipt_invoice(settings)
+        text = build_receipt_text(invoice, items, settings)
+        self.receipt_preview.configure(state="normal")
+        self.receipt_preview.delete("1.0", "end")
+        self.receipt_preview.insert("1.0", text)
+        self.receipt_preview.configure(state="disabled")
 
     def _field(self, parent, label, key, placeholder=""):
         T.field_label(parent, label).pack(anchor="w", pady=(0, 4))
@@ -273,6 +401,11 @@ class SettingsTab(ctk.CTkFrame):
         if "receipt_footer" in settings:
             self.receipt_footer.delete("1.0", "end")
             self.receipt_footer.insert("1.0", settings["receipt_footer"])
+        self.font_size_var.set(settings.get("receipt_font_size", "normal") or "normal")
+        self.header_spacing_var.set(settings.get("receipt_header_spacing", "normal") or "normal")
+        for key, var in self.design_toggles.items():
+            var.set(str(settings.get(key, "1")).strip() not in ("0", "false", "False", ""))
+        self.refresh_receipt_preview()
 
     def save_settings(self):
         try:
@@ -291,6 +424,11 @@ class SettingsTab(ctk.CTkFrame):
             self.entries["printer_name"].insert(0, printer)
             save_setting("receipt_width", self.width_var.get())
             save_setting("receipt_footer", self.receipt_footer.get("1.0", "end").strip())
+            save_setting("receipt_font_size", self.font_size_var.get())
+            save_setting("receipt_header_spacing", self.header_spacing_var.get())
+            for key, var in self.design_toggles.items():
+                save_setting(key, "1" if var.get() else "0")
+            self.refresh_receipt_preview()
             self.winfo_toplevel().set_status("Settings saved")
             toast(self, "Your changes have been saved.", kind="success", title="Settings saved")
         except Exception as e:

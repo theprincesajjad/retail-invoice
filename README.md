@@ -14,7 +14,7 @@ Built so an 85-year-old can complete a sale, and a busy business owner can run t
 
 That’s it. A welcome wizard may appear; you can fill it in or click **Skip for now** and start selling immediately.
 
-Current stable: **1.4.0** · Latest beta: **1.4.2-beta**
+Current stable: **1.4.0** · Latest beta: **1.4.3-beta**
 
 ---
 

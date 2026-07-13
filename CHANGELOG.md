@@ -2,6 +2,23 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.4.3-beta] — 2026-07-13
+
+### Receipt design
+
+- Fixed broken thermal layout caused by double-height body text (wrapped dates, garbled columns)
+- Customer / phone print inline; compact date format
+- Setup tab: live receipt preview + show/hide toggles, title size, header spacing
+
+### New Sale UI
+
+- Compact Name | Phone row (removed Customer section title)
+- Items list more visible without scrolling
+- Tabs moved inline with the Retail Invoice title
+- Details field shown when selecting a product by SKU/search
+
+---
+
 ## [1.4.2-beta] — 2026-07-11
 
 ### Fixes
