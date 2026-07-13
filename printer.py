@@ -8,6 +8,7 @@ from receipt_builder import (
     build_receipt_text,
     prepare_logo_image,
     resolve_logo_path,
+    sample_receipt_invoice,
 )
 
 # ESC/POS control bytes
@@ -16,14 +17,29 @@ ESC_BOLD_ON = b"\x1b\x45\x01"
 ESC_BOLD_OFF = b"\x1b\x45\x00"
 ESC_ALIGN_LEFT = b"\x1b\x61\x00"
 ESC_ALIGN_CENTER = b"\x1b\x61\x01"
-ESC_DOUBLE_HEIGHT = b"\x1d\x21\x10"  # taller body text
+ESC_DOUBLE_HEIGHT = b"\x1d\x21\x10"
 ESC_CHAR_NORMAL = b"\x1d\x21\x00"
 ESC_LINE_SPACING_DEFAULT = b"\x1b\x32"
-ESC_LINE_SPACING_54 = b"\x1b\x33\x36"  # 54 dots — roomier than default
+ESC_LINE_SPACING_30 = b"\x1b\x33\x1e"  # compact
+ESC_LINE_SPACING_42 = b"\x1b\x33\x2a"  # normal
+ESC_LINE_SPACING_54 = b"\x1b\x33\x36"  # roomy
 ESC_FEED_LINES = b"\x1b\x64\x06"
 ESC_CUT = b"\x1d\x56\x00"
 
 LOGO_PRINT_WIDTH = 512
+
+
+def _line_spacing(settings: dict) -> bytes:
+    spacing = settings.get("receipt_header_spacing", "normal")
+    if spacing == "compact":
+        return ESC_LINE_SPACING_30
+    if spacing == "roomy":
+        return ESC_LINE_SPACING_54
+    return ESC_LINE_SPACING_42
+
+
+def _large_titles(settings: dict) -> bool:
+    return settings.get("receipt_font_size", "normal") == "large"
 
 
 def _list_windows_printers() -> list[str]:
@@ -96,10 +112,39 @@ def _encode_text(text: str) -> bytes:
     return text.encode("utf-8", errors="replace")
 
 
+def _header_skip_set(settings: dict) -> set[str]:
+    business = settings.get("business_name", "My Business").strip().upper()
+    return {
+        business,
+        settings.get("business_tagline", "").strip(),
+        settings.get("business_address", "").strip(),
+        settings.get("business_website", "").strip(),
+        settings.get("business_phone", "").strip(),
+        settings.get("business_email", "").strip(),
+        "SALES RECEIPT",
+        "Tax Receipt",
+    }
+
+
+def _clean_body(invoice: Invoice, items: list[InvoiceItem], settings: dict) -> str:
+    body = build_receipt_text(invoice, items, settings)
+    skip = _header_skip_set(settings)
+    cleaned_lines = []
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped in skip:
+            continue
+        if not stripped and cleaned_lines and not cleaned_lines[-1].strip():
+            continue
+        cleaned_lines.append(line)
+    return "\n".join(cleaned_lines).lstrip("\n")
+
+
 def _build_escpos_bytes(invoice: Invoice, items: list[InvoiceItem], settings: dict) -> bytes:
+    large = _large_titles(settings)
     chunks: list[bytes] = [
         ESC_INIT,
-        ESC_LINE_SPACING_54,
+        _line_spacing(settings),
     ]
 
     logo_path = resolve_logo_path(settings)
@@ -109,52 +154,15 @@ def _build_escpos_bytes(invoice: Invoice, items: list[InvoiceItem], settings: di
         except Exception as e:
             logging.warning(f"Logo skipped: {e}")
 
-    business = settings.get("business_name", "My Business").strip().upper()
-    chunks.extend([
-        ESC_ALIGN_CENTER,
-        ESC_DOUBLE_HEIGHT,
-        ESC_BOLD_ON,
-        _encode_text(business + "\n"),
-        ESC_BOLD_OFF,
-        ESC_CHAR_NORMAL,
-    ])
-
-    tagline = settings.get("business_tagline", "").strip()
-    if tagline:
-        chunks.append(_encode_text(tagline + "\n\n"))
-    else:
-        chunks.append(_encode_text("\n"))
-
-    for field in ("business_address", "business_website", "business_phone", "business_email"):
-        value = settings.get(field, "").strip()
-        if value:
-            chunks.append(_encode_text(value + "\n\n"))
-
-    chunks.extend([ESC_BOLD_ON, ESC_DOUBLE_HEIGHT, _encode_text("SALES RECEIPT\n"), ESC_CHAR_NORMAL, ESC_BOLD_OFF, _encode_text("\n")])
-
+    # Print body at NORMAL character size so columns stay aligned.
+    # Optional double-height only for store name + title.
     body = build_receipt_text(invoice, items, settings)
-    # Skip duplicate header lines already printed above (logo + business block).
-    skip_prefixes = (
-        business,
-        tagline,
-        settings.get("business_address", "").strip(),
-        settings.get("business_website", "").strip(),
-        settings.get("business_phone", "").strip(),
-        settings.get("business_email", "").strip(),
-        "SALES RECEIPT",
-        "Tax Receipt",
-    )
-    cleaned_lines = []
-    for line in body.splitlines():
-        stripped = line.strip()
-        if stripped in skip_prefixes:
-            continue
-        if not stripped and cleaned_lines and not cleaned_lines[-1].strip():
-            continue
-        cleaned_lines.append(line)
-    cleaned_body = "\n".join(cleaned_lines).lstrip("\n")
+    chunks.extend([ESC_ALIGN_LEFT, ESC_CHAR_NORMAL, _encode_text(body)])
 
-    chunks.extend([ESC_ALIGN_LEFT, ESC_DOUBLE_HEIGHT, _encode_text(cleaned_body)])
+    # When large titles are preferred, reprint is handled in escpos path;
+    # raw path keeps monospace integrity with normal size for the whole receipt.
+    _ = large
+
     chunks.extend([
         ESC_CHAR_NORMAL,
         ESC_LINE_SPACING_DEFAULT,
@@ -187,7 +195,8 @@ def _print_with_escpos(printer_name: str, invoice: Invoice, items: list[InvoiceI
     from escpos.printer import Win32Raw
 
     printer = Win32Raw(printer_name)
-    printer._raw(ESC_INIT + ESC_LINE_SPACING_54)
+    printer._raw(ESC_INIT + _line_spacing(settings))
+    large = _large_titles(settings)
 
     logo_path = resolve_logo_path(settings)
     if logo_path:
@@ -199,45 +208,44 @@ def _print_with_escpos(printer_name: str, invoice: Invoice, items: list[InvoiceI
         except Exception as e:
             logging.warning(f"Logo skipped: {e}")
 
-    business = settings.get("business_name", "My Business").strip().upper()
-    printer.set(align="center", bold=True, height=2, width=1)
-    printer.text(business + "\n")
-    printer.set(bold=False, height=1, width=1)
+    # Prefer printing the designed monospace layout at normal size so Item/Qty/Price/Total
+    # columns never wrap. Large mode only enlarges the store name and SALES RECEIPT title.
+    if large:
+        business = settings.get("business_name", "My Business").strip().upper()
+        if business and str(settings.get("receipt_show_business_name", "1")) not in ("0", "false", ""):
+            printer.set(align="center", bold=True, height=2, width=1)
+            printer.text(business + "\n")
+            printer.set(bold=False, height=1, width=1)
 
-    tagline = settings.get("business_tagline", "").strip()
-    if tagline:
-        printer.text(tagline + "\n")
-    printer.text("\n")
+        tagline = settings.get("business_tagline", "").strip()
+        if tagline and str(settings.get("receipt_show_tagline", "1")) not in ("0", "false", ""):
+            printer.set(align="center")
+            printer.text(tagline + "\n")
 
-    for field in ("business_address", "business_website", "business_phone", "business_email"):
-        value = settings.get(field, "").strip()
-        if value:
-            printer.text(value + "\n\n")
+        for field, key in (
+            ("business_address", "receipt_show_address"),
+            ("business_phone", "receipt_show_phone"),
+            ("business_website", "receipt_show_website"),
+            ("business_email", "receipt_show_email"),
+        ):
+            if str(settings.get(key, "1")) in ("0", "false", ""):
+                continue
+            value = settings.get(field, "").strip()
+            if value:
+                printer.set(align="center")
+                printer.text(value + "\n")
 
-    printer.set(bold=True, height=2, width=1)
-    printer.text("SALES RECEIPT\n")
-    printer.set(bold=False, height=1, width=1)
-    printer.text("\n")
+        printer.text("\n")
+        printer.set(align="center", bold=True, height=2, width=1)
+        printer.text("SALES RECEIPT\n")
+        printer.set(bold=False, height=1, width=1)
+        printer.text("\n")
 
-    printer.set(align="left", height=2, width=1)
-    body = build_receipt_text(invoice, items, settings)
-    skip = {
-        business,
-        tagline,
-        settings.get("business_address", "").strip(),
-        settings.get("business_website", "").strip(),
-        settings.get("business_phone", "").strip(),
-        settings.get("business_email", "").strip(),
-        "SALES RECEIPT",
-        "Tax Receipt",
-    }
-    lines = []
-    for line in body.splitlines():
-        if line.strip() in skip:
-            continue
-        lines.append(line)
-    printer.text("\n".join(lines).lstrip("\n") + "\n")
-    printer.set(height=1, width=1)
+        printer.set(align="left", height=1, width=1)
+        printer.text(_clean_body(invoice, items, settings) + "\n")
+    else:
+        printer.set(align="left", height=1, width=1)
+        printer.text(build_receipt_text(invoice, items, settings) + "\n")
 
     try:
         printer.cut()
@@ -264,14 +272,12 @@ def print_receipt(invoice: Invoice, items: list[InvoiceItem]) -> tuple[bool, str
 
     errors: list[str] = []
 
-    # 1) escpos handles logos and formatting best on Epson TM-T20
     try:
         return _print_with_escpos(printer_name, invoice, items, settings)
     except Exception as e:
         errors.append(f"escpos: {e}")
         logging.error(f"escpos print failed: {e}")
 
-    # 2) Raw ESC/POS with embedded logo raster
     try:
         datatype = _get_raw_datatype(printer_name)
         data = _build_escpos_bytes(invoice, items, settings)
@@ -283,7 +289,6 @@ def print_receipt(invoice: Invoice, items: list[InvoiceItem]) -> tuple[bool, str
         errors.append(f"RAW: {e}")
         logging.error(f"RAW print failed: {e}")
 
-    # 3) Plain text through Windows driver
     try:
         text = build_receipt_text(invoice, items, settings) + "\n\n\n"
         ok, msg = _print_bytes_win32(printer_name, _encode_text(text), "TEXT")
@@ -300,32 +305,6 @@ def print_receipt(invoice: Invoice, items: list[InvoiceItem]) -> tuple[bool, str
 
 def print_test_receipt() -> tuple[bool, str]:
     """Print a sample receipt to verify printer setup."""
-    from datetime import datetime
-    from models import Invoice, InvoiceItem
-
     settings = get_all_settings()
-    invoice = Invoice(
-        id=None,
-        invoice_number="TEST-0001",
-        customer_name="Test Customer",
-        customer_phone="(416) 555-0100",
-        subtotal=29.99,
-        tax_rate=float(settings.get("tax_rate", "0.13")),
-        tax_amount=3.90,
-        total=33.89,
-        payment_method="Cash",
-        notes="",
-        created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        items=[],
-        discount_type="",
-        discount_value=0,
-        discount_amount=0,
-    )
-    items = [
-        InvoiceItem(
-            id=None, invoice_id=None, product_id=None,
-            description="Sample Product", serial_number="",
-            qty=1, unit_price=29.99, line_total=29.99,
-        ),
-    ]
+    invoice, items = sample_receipt_invoice(settings)
     return print_receipt(invoice, items)
