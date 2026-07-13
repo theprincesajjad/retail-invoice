@@ -429,6 +429,9 @@ class SettingsTab(ctk.CTkFrame):
             for key, var in self.design_toggles.items():
                 save_setting(key, "1" if var.get() else "0")
             self.refresh_receipt_preview()
+            app = self.winfo_toplevel()
+            if hasattr(app, "refresh_header_brand"):
+                app.refresh_header_brand()
             self.winfo_toplevel().set_status("Settings saved")
             toast(self, "Your changes have been saved.", kind="success", title="Settings saved")
         except Exception as e:

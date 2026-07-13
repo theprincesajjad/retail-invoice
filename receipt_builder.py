@@ -166,6 +166,9 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
             lines.append(_inline("Customer", invoice.customer_name, width))
         if invoice.customer_phone:
             lines.append(_inline("Phone", invoice.customer_phone, width))
+        email = getattr(invoice, "customer_email", "") or ""
+        if email:
+            lines.append(_inline("Email", email, width))
 
     lines.append(blank)
     lines.append(single)

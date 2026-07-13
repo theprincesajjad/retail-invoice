@@ -2,6 +2,17 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.4.4-beta] — 2026-07-13
+
+### Wireframe UI
+
+- New Sale rebuilt to match desk wireframe: compact Name/Phone/Email, SKU + Custom rows, dominant items list, totals/notes/discount rail, COMPLETE / PREVIEW / SAVE / NEW dock
+- Header shows store logo + business name with tabs inline
+- Add Product dialog: SKU|Price, Name, Details, Save Next (F5) / Save Close (F6), Qty
+- Hotkeys: F1 New, F10 Save, F11 Preview, F12 Complete + Print
+
+---
+
 ## [1.4.3-beta] — 2026-07-13
 
 ### Receipt design
