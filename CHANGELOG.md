@@ -2,6 +2,20 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.5.0] — 2026-07-14
+
+### UI polish
+
+- Header: removed top-right nav menu; restored standard tab strip under the title bar
+- Add Product: SKU + Price + Qty on one compact top row; Name and Details full width below
+- Receipts: Item and Details wrap only inside the Item column (no spill into Qty/Price/Total)
+
+### Stable cut
+
+Promotes the 1.4.x beta line (wireframe New Sale, receipt design Setup, Details field, toast/print fixes) to a full release.
+
+---
+
 ## [1.4.4-beta] — 2026-07-13
 
 ### Wireframe UI

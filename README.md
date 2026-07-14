@@ -9,12 +9,12 @@ Built so an 85-year-old can complete a sale, and a busy business owner can run t
 ## Download (easiest)
 
 1. Open **[Releases](https://github.com/theprincesajjad/retail-invoice/releases)**
-2. Download the latest **Windows.exe** (stable or beta)
+2. Download the latest **Windows.exe**
 3. Double-click — no install, no Python, no setup required
 
 That’s it. A welcome wizard may appear; you can fill it in or click **Skip for now** and start selling immediately.
 
-Current stable: **1.4.0** · Latest beta: **1.4.4-beta**
+Current release: **1.5.0**
 
 ---
 
@@ -85,8 +85,8 @@ Or let GitHub Actions build it — push a version tag:
 
 ```bash
 # Update VERSION and CHANGELOG.md, commit, then:
-git tag v1.4.0
-git push origin v1.4.0
+git tag v1.5.0
+git push origin v1.5.0
 ```
 
 That triggers [.github/workflows/release.yml](.github/workflows/release.yml), which builds `RetailInvoice-x.x.x-Windows.exe` and publishes a GitHub Release.

@@ -38,7 +38,7 @@ def get_app_version() -> str:
     try:
         return (base / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return "1.4.4-beta"
+        return "1.5.0"
 
 
 class App(ctk.CTk):
@@ -106,25 +106,8 @@ class App(ctk.CTk):
         self.header_business.pack(side="left")
         self.refresh_header_brand()
 
-        self.nav = ctk.CTkSegmentedButton(
-            header,
-            values=[TAB_HOME, TAB_INVENTORY, TAB_REPORTS, TAB_SETTINGS],
-            command=self._on_nav,
-            font=T.FONT_MEDIUM,
-            height=36,
-            selected_color=T.ACCENT,
-            selected_hover_color=T.ACCENT_HOVER,
-            unselected_color=T.SURFACE_ALT,
-            unselected_hover_color=T.BORDER_LIGHT,
-            text_color=T.TEXT,
-            fg_color=T.SURFACE_ALT,
-            corner_radius=T.RADIUS_SM,
-        )
-        self.nav.grid(row=0, column=2, sticky="e", padx=(0, 18), pady=8)
-        self.nav.set(TAB_HOME)
-
         ctk.CTkFrame(header, fg_color=T.BORDER_LIGHT, height=1, corner_radius=0).grid(
-            row=1, column=0, columnspan=3, sticky="ew"
+            row=1, column=0, columnspan=2, sticky="ew"
         )
 
     def refresh_header_brand(self):
@@ -149,11 +132,6 @@ class App(ctk.CTk):
                 pass
         self.header_logo.configure(image=None, text="◆", font=T.FONT_HEADLINE, text_color=T.ACCENT)
 
-    def _on_nav(self, value):
-        if hasattr(self, "tabview"):
-            self.tabview.set(value)
-            self._on_tab_change()
-
     def _build_tabs(self):
         shell = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         shell.grid(row=1, column=0, sticky="nsew", padx=16, pady=(6, 10))
@@ -164,15 +142,6 @@ class App(ctk.CTk):
             shell, command=self._on_tab_change, **T.tabview_kwargs(),
         )
         self.tabview.grid(row=0, column=0, sticky="nsew")
-
-        # Tabs live in the header — hide the built-in segmented control
-        try:
-            self.tabview._segmented_button.grid_remove()
-        except Exception:
-            try:
-                self.tabview._segmented_button.pack_forget()
-            except Exception:
-                pass
 
         for name in (TAB_HOME, TAB_INVENTORY, TAB_REPORTS, TAB_SETTINGS):
             self.tabview.add(name)
@@ -190,7 +159,6 @@ class App(ctk.CTk):
         self.settings_tab.pack(fill="both", expand=True, padx=4, pady=4)
 
         self.tabview.set(TAB_HOME)
-        self.nav.set(TAB_HOME)
 
     def _build_status(self):
         bar = ctk.CTkFrame(self, fg_color=T.SURFACE, corner_radius=0, height=36, border_width=0)
@@ -217,11 +185,6 @@ class App(ctk.CTk):
     def _on_tab_change(self, *args):
         current = self.current_tab()
         self.shortcut_var.set(SHORTCUT_HELP.get(current, ""))
-        if hasattr(self, "nav") and self.nav.get() != current:
-            try:
-                self.nav.set(current)
-            except Exception:
-                pass
 
     def current_tab(self) -> str:
         return self.tabview.get()
@@ -251,8 +214,6 @@ class App(ctk.CTk):
 
     def _goto(self, tab):
         self.tabview.set(tab)
-        if hasattr(self, "nav"):
-            self.nav.set(tab)
         self._on_tab_change()
 
     def _on_invoice(self, action):

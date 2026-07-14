@@ -1,27 +1,24 @@
-## Retail Invoice 1.4.4-beta
+## Retail Invoice 1.5.0
 
-**Beta preview** — download `RetailInvoice-1.4.4-beta-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.5.0-Windows.exe`, double-click, and go.
 
-### Wireframe UI
+### UI polish
 
-New Sale and Add Product are laid out to match the desk sketch:
+- Cleaner header: title + store brand only; tabs sit on the standard strip underneath (no top-right menu)
+- Add Product: SKU, Price, and Qty on one compact top row; Name and Details full width below
+- Receipts: item descriptions and Details wrap inside the Item column only — nothing spills into Qty / Price / Total (80mm and 58mm)
 
-**Header** — `RETAIL INVOICE` · store logo + name · tabs inline  
-**Customer** — Name · Phone · Email on one tight row  
-**SKU row** — Code · `SKU — Name — Details — Qty` picker · ADD  
-**Custom row** — Description · Qty · Price · ADD  
-**Items** — large “ITEMS IN THIS SALE” list (main surface)  
-**Right rail** — Subtotal / HST / TOTAL DUE · Notes · Discount `%` / `$`  
-**Actions** — COMPLETE (F12) · PREVIEW (F11) · SAVE (F10) · NEW (F1)
+### Included from recent builds
 
-**Add Product** — SKU + Price on top · Name · Details · Save Next (F5) · Save Close (F6) · Qty
+- Wireframe New Sale layout (Name · Phone · Email, SKU + Custom rows, large items list)
+- Receipt design controls in Setup (live preview, show/hide sections)
+- Details field (replacing S/N labels), Cash/Card before print, Save Next / Save Close
+- Toast fix for save/print; invoice numbers `INV-786-xxxx`
 
 ### Hotkeys
 
-F1 New · F2 Products · F3 Sales · F4 Setup · F10 Save · F11 Preview · F12 Complete + Print
+F1 New · F2 Products · F3 Sales · F4 Setup · F5/F6 product save · F10 Save · F11 Preview · F12 Complete + Print
 
 ### Requirements
 
 - Windows 10 or 11
-
-Stable channel remains [v1.4.0](https://github.com/theprincesajjad/retail-invoice/releases/tag/v1.4.0).

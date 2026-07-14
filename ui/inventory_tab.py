@@ -157,7 +157,7 @@ class InventoryTab(ctk.CTkFrame):
         self._product_dialog = dialog
         dialog.title("Add product" if is_new else "Edit product")
 
-        width, height = 520, 420
+        width, height = 520, 360
         dialog.configure(fg_color=T.BG)
         dialog.resizable(False, False)
         dialog.geometry(f"{width}x{height}")
@@ -177,53 +177,51 @@ class InventoryTab(ctk.CTkFrame):
         body = ctk.CTkFrame(card, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=20, pady=(18, 8))
         body.grid_columnconfigure(0, weight=1)
-        body.grid_columnconfigure(1, weight=1)
+        body.grid_columnconfigure(1, weight=0)
+        body.grid_columnconfigure(2, weight=0)
 
-        # Row 1: PRODUCT SKU | PRICE
+        # Top row: PRODUCT SKU | PRICE | QTY (compact)
         ctk.CTkLabel(body, text="PRODUCT SKU", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=0, column=0, sticky="w", padx=(0, 10)
         )
         ctk.CTkLabel(body, text="PRICE", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=0, column=1, sticky="w"
+            row=0, column=1, sticky="w", padx=(0, 10)
         )
-        sku_entry = ctk.CTkEntry(body, placeholder_text="e.g. 60000", **T.entry_kwargs())
-        sku_entry.grid(row=1, column=0, sticky="ew", padx=(0, 10), pady=(4, 14))
-        price_entry = ctk.CTkEntry(body, placeholder_text="0.00", **T.entry_kwargs())
-        price_entry.grid(row=1, column=1, sticky="ew", pady=(4, 14))
+        ctk.CTkLabel(body, text="QTY", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+            row=0, column=2, sticky="w"
+        )
+        sku_entry = ctk.CTkEntry(body, placeholder_text="e.g. 60000", **T.entry_kwargs(width=120))
+        sku_entry.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=(4, 14))
+        price_entry = ctk.CTkEntry(body, placeholder_text="0.00", **T.entry_kwargs(width=90))
+        price_entry.grid(row=1, column=1, sticky="w", padx=(0, 10), pady=(4, 14))
+        qty_entry = ctk.CTkEntry(body, placeholder_text="1", **T.entry_kwargs(width=70))
+        qty_entry.grid(row=1, column=2, sticky="w", pady=(4, 14))
 
-        # Row 2: PRODUCT NAME
+        # Full-width name + details
         ctk.CTkLabel(body, text="PRODUCT NAME", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=2, column=0, columnspan=2, sticky="w"
+            row=2, column=0, columnspan=3, sticky="w"
         )
         name_entry = ctk.CTkEntry(body, placeholder_text="What is this product called?", **T.entry_kwargs())
-        name_entry.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 14))
+        name_entry.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(4, 14))
 
-        # Row 3: DETAILS
         ctk.CTkLabel(body, text="DETAILS", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=4, column=0, columnspan=2, sticky="w"
+            row=4, column=0, columnspan=3, sticky="w"
         )
         details_entry = ctk.CTkEntry(
             body, placeholder_text="Specs, S/N, or other text for the invoice", **T.entry_kwargs(),
         )
-        details_entry.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(4, 8))
+        details_entry.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(4, 8))
 
         entries = {
             "sku": sku_entry,
             "price": price_entry,
+            "qty": qty_entry,
             "name": name_entry,
             "serial_number": details_entry,
         }
 
         footer = ctk.CTkFrame(card, fg_color="transparent")
         footer.pack(fill="x", padx=20, pady=(4, 18))
-
-        # QTY on the right of the action row (wireframe)
-        qty_wrap = ctk.CTkFrame(footer, fg_color="transparent")
-        qty_wrap.pack(side="right")
-        ctk.CTkLabel(qty_wrap, text="QTY", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).pack(anchor="w")
-        qty_entry = ctk.CTkEntry(qty_wrap, placeholder_text="1", **T.entry_kwargs(width=80))
-        qty_entry.pack(anchor="e", pady=(4, 0))
-        entries["qty"] = qty_entry
 
         if product:
             sku_entry.insert(0, product.sku or "")
@@ -273,7 +271,7 @@ class InventoryTab(ctk.CTkFrame):
             except ValueError as e:
                 messagebox.showerror("Please check your entries", str(e), parent=dialog)
 
-        ordered = [sku_entry, price_entry, name_entry, details_entry, qty_entry]
+        ordered = [sku_entry, price_entry, qty_entry, name_entry, details_entry]
 
         def focus_next(index: int):
             ordered[(index + 1) % len(ordered)].focus_set()

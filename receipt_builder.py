@@ -65,18 +65,28 @@ def _format_receipt_date(created_at: str | None) -> str:
 def _item_columns(width: int) -> tuple[int, int, int, int]:
     """Return desc/qty/price/total widths that fit exactly in `width` chars.
 
-    Layout: DESC + ' ' + QTY + ' ' + PRICE + ' ' + TOTAL
+    Layout: DESC + ' ' + QTY + ' ' + PRICE + ' ' + TOTAL  (3 gaps)
     """
     gaps = 3
     if width <= 32:
         w_qty, w_unit, w_total = 3, 7, 7
     else:
-        w_qty, w_unit, w_total = 3, 9, 9
+        w_qty, w_unit, w_total = 4, 10, 10
     w_desc = width - gaps - w_qty - w_unit - w_total
-    return max(8, w_desc), w_qty, w_unit, w_total
+    if w_desc < 8:
+        # Narrow paper: steal from price/total until desc is usable
+        deficit = 8 - w_desc
+        take_unit = min(deficit, max(0, w_unit - 6))
+        w_unit -= take_unit
+        deficit -= take_unit
+        w_total -= min(deficit, max(0, w_total - 6))
+        w_desc = width - gaps - w_qty - w_unit - w_total
+    return w_desc, w_qty, w_unit, w_total
 
 
 def _wrap_text(text: str, width: int) -> list[str]:
+    """Word-wrap to `width`, hard-breaking long words. Never returns a line > width."""
+    width = max(1, width)
     text = (text or "").strip()
     if not text:
         return [""]
@@ -98,7 +108,28 @@ def _wrap_text(text: str, width: int) -> list[str]:
             current = word
     if current:
         lines.append(current)
-    return lines or [""]
+    return [line[:width] for line in (lines or [""])]
+
+
+def _format_item_line(
+    desc: str, qty: str, price: str, total: str,
+    w_desc: int, w_qty: int, w_unit: int, w_total: int,
+) -> str:
+    """One receipt item row; Item text is hard-clamped to the Item column."""
+    return (
+        f"{desc[:w_desc]:<{w_desc}} "
+        f"{qty[:w_qty]:>{w_qty}} "
+        f"{price[:w_unit]:>{w_unit}} "
+        f"{total[:w_total]:>{w_total}}"
+    )
+
+
+def _format_item_cont(desc: str, w_desc: int, w_qty: int, w_unit: int, w_total: int) -> str:
+    """Continuation / Details line: text only in Item column; Qty/Price/Total blank."""
+    blank_qty = " " * w_qty
+    blank_unit = " " * w_unit
+    blank_total = " " * w_total
+    return f"{desc[:w_desc]:<{w_desc}} {blank_qty} {blank_unit} {blank_total}"
 
 
 def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dict | None = None) -> str:
@@ -179,13 +210,15 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
         desc_lines = _wrap_text(item.description, w_desc)
         unit = format_currency(item.unit_price)
         total = format_currency(item.line_total)
-        first = desc_lines[0]
-        lines.append(f"{first:<{w_desc}} {item.qty:>{w_qty}} {unit:>{w_unit}} {total:>{w_total}}")
+        qty_s = str(item.qty)
+        lines.append(
+            _format_item_line(desc_lines[0], qty_s, unit, total, w_desc, w_qty, w_unit, w_total)
+        )
         for extra in desc_lines[1:]:
-            lines.append(f"{extra:<{w_desc}}")
+            lines.append(_format_item_cont(extra, w_desc, w_qty, w_unit, w_total))
         if item.serial_number and _on(settings, "receipt_show_details", "1"):
-            for detail_line in _wrap_text(item.serial_number, width - 2):
-                lines.append(f"  {detail_line}")
+            for detail_line in _wrap_text(f"Details: {item.serial_number}", w_desc):
+                lines.append(_format_item_cont(detail_line, w_desc, w_qty, w_unit, w_total))
 
     lines.append(single)
     lines.append(blank)
