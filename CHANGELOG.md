@@ -2,6 +2,27 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.0-beta] — 2026-07-15
+
+### Products
+
+- **Batch import** from Excel (`.xlsx`) or CSV (Google Sheets → Download → Excel/CSV)
+- **Download template** on the Products tab — headings: SKU, Product Name, Details, Qty, Price
+- Matching SKUs update existing products; new SKUs are added
+- Add Product **Save Next** and **Save Close** buttons are the same size and style (F5 / F6)
+
+### New Sale
+
+- **Discount before or after tax** — choose per sale; default lives in Setup
+- Totals / Notes / Discount rail is **scrollable** so it stays usable at 125% display scaling
+- After **F12 Complete + Print**: **F7 Cash**, **F8 Card** (payment window), then **F12** to confirm
+
+### Receipts
+
+- One blank line between items on the printed invoice
+
+---
+
 ## [1.5.0] — 2026-07-14
 
 ### UI polish

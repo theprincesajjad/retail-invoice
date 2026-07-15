@@ -81,6 +81,7 @@ def _migrate_schema(conn):
         "ALTER TABLE invoices ADD COLUMN discount_type TEXT DEFAULT ''",
         "ALTER TABLE invoices ADD COLUMN discount_value REAL DEFAULT 0",
         "ALTER TABLE invoices ADD COLUMN discount_amount REAL DEFAULT 0",
+        "ALTER TABLE invoices ADD COLUMN discount_timing TEXT DEFAULT 'before_tax'",
         "ALTER TABLE invoices ADD COLUMN customer_email TEXT DEFAULT ''",
     ):
         try:
@@ -181,15 +182,17 @@ def save_invoice(invoice: Invoice, items: list[InvoiceItem]):
             INSERT INTO invoices (
                 invoice_number, customer_name, customer_phone, customer_email,
                 subtotal, tax_rate, tax_amount, total,
-                payment_method, notes, discount_type, discount_value, discount_amount
+                payment_method, notes, discount_type, discount_value, discount_amount,
+                discount_timing
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             invoice.invoice_number, invoice.customer_name, invoice.customer_phone,
             getattr(invoice, "customer_email", "") or "",
             invoice.subtotal, invoice.tax_rate, invoice.tax_amount, invoice.total,
             invoice.payment_method, invoice.notes,
             invoice.discount_type or "", invoice.discount_value or 0.0, invoice.discount_amount or 0.0,
+            getattr(invoice, "discount_timing", None) or "before_tax",
         ))
         
         invoice_id = cursor.lastrowid
@@ -248,6 +251,7 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
             data.setdefault("discount_type", "")
             data.setdefault("discount_value", 0.0)
             data.setdefault("discount_amount", 0.0)
+            data.setdefault("discount_timing", "before_tax")
             data.setdefault("customer_email", "")
             inv = Invoice(**data, items=[])
             cursor.execute('SELECT * FROM invoice_items WHERE invoice_id = ?', (inv.id,))

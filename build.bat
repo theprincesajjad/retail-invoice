@@ -36,6 +36,7 @@ pyinstaller --name "RetailInvoice" --onefile --windowed --noconfirm --clean ^
     --hidden-import win32api ^
     --hidden-import reportlab ^
     --hidden-import reportlab.pdfgen.canvas ^
+    --hidden-import openpyxl ^
     main.py
 
 echo ==============================================

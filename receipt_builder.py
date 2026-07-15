@@ -219,6 +219,8 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
         if item.serial_number and _on(settings, "receipt_show_details", "1"):
             for detail_line in _wrap_text(f"Details: {item.serial_number}", w_desc):
                 lines.append(_format_item_cont(detail_line, w_desc, w_qty, w_unit, w_total))
+        # One blank line between items for readability on thermal paper
+        lines.append(blank)
 
     lines.append(single)
     lines.append(blank)
@@ -230,12 +232,21 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
         return f"{label:>{width - len(value) - 1}} {value}"
 
     lines.append(money_row("Subtotal", invoice.subtotal))
-    if getattr(invoice, "discount_amount", 0) and invoice.discount_amount > 0:
+    timing = getattr(invoice, "discount_timing", "before_tax") or "before_tax"
+    has_discount = getattr(invoice, "discount_amount", 0) and invoice.discount_amount > 0
+
+    def discount_row():
+        when = "after tax" if timing == "after_tax" else "before tax"
         if invoice.discount_type == "percent":
-            lines.append(money_row(f"Discount ({invoice.discount_value:g}%)", invoice.discount_amount))
+            lines.append(money_row(f"Discount ({invoice.discount_value:g}% {when})", invoice.discount_amount))
         else:
-            lines.append(money_row("Discount", invoice.discount_amount))
+            lines.append(money_row(f"Discount ({when})", invoice.discount_amount))
+
+    if has_discount and timing != "after_tax":
+        discount_row()
     lines.append(money_row(f"Tax ({tax_pct}%)", invoice.tax_amount))
+    if has_discount and timing == "after_tax":
+        discount_row()
     lines.append(blank)
     lines.append(money_row("TOTAL", invoice.total))
     lines.append(blank)
