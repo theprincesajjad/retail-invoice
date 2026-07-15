@@ -49,6 +49,19 @@ class SettingsTab(ctk.CTkFrame):
         self.tax_pct_entry = ctk.CTkEntry(bus_inner, placeholder_text="13", **T.entry_kwargs(width=120))
         self.tax_pct_entry.pack(anchor="w", pady=(6, 12))
 
+        T.field_label(bus_inner, "Default discount timing", "Used on New Sale — can still change per invoice").pack(
+            anchor="w", pady=(4, 6)
+        )
+        self.discount_timing_var = ctk.StringVar(value="before_tax")
+        timing_row = ctk.CTkFrame(bus_inner, fg_color="transparent")
+        timing_row.pack(anchor="w", pady=(0, 12))
+        for val, label in (("before_tax", "Before tax"), ("after_tax", "After tax")):
+            ctk.CTkRadioButton(
+                timing_row, text=label, variable=self.discount_timing_var, value=val,
+                font=T.FONT, text_color=T.TEXT, fg_color=T.ACCENT, border_color=T.BORDER,
+                radiobutton_width=20, radiobutton_height=20,
+            ).pack(side="left", padx=(0, 20))
+
         T.field_label(bus_inner, "Return policy", "Printed at the bottom of receipts").pack(anchor="w", pady=(4, 4))
         self.receipt_footer = ctk.CTkTextbox(
             bus_inner, height=80, fg_color=T.SURFACE_ALT, border_color=T.BORDER,
@@ -394,6 +407,10 @@ class SettingsTab(ctk.CTkFrame):
         except ValueError:
             self.tax_pct_entry.delete(0, "end")
             self.tax_pct_entry.insert(0, "13")
+        timing = settings.get("discount_timing", "before_tax") or "before_tax"
+        if timing not in ("before_tax", "after_tax"):
+            timing = "before_tax"
+        self.discount_timing_var.set(timing)
         if "receipt_width" in settings:
             self.width_var.set(settings["receipt_width"])
         if "printer_name" in settings:
@@ -418,6 +435,7 @@ class SettingsTab(ctk.CTkFrame):
                 save_setting("tax_rate", str(pct / 100))
             except ValueError:
                 save_setting("tax_rate", "0.13")
+            save_setting("discount_timing", self.discount_timing_var.get() or "before_tax")
             printer = self.printer_var.get().strip() or self.entries["printer_name"].get().strip()
             save_setting("printer_name", printer)
             self.entries["printer_name"].delete(0, "end")

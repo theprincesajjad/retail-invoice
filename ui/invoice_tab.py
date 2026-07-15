@@ -149,8 +149,8 @@ class InvoiceTab(ctk.CTkFrame):
         self.item_rows_frame = ctk.CTkFrame(self.items_scroll, fg_color="transparent")
         self.item_rows_frame.pack(fill="both", expand=True, padx=6, pady=(0, 10))
 
-        # Right rail — totals, notes, discount (no scroll needed)
-        side = ctk.CTkFrame(body, fg_color="transparent", width=300)
+        # Right rail — scrollable so totals/notes/discount stay reachable at 125% scaling
+        side = ctk.CTkScrollableFrame(body, fg_color="transparent", width=300, corner_radius=0)
         side.grid(row=0, column=1, sticky="nsew")
 
         summary = ctk.CTkFrame(side, fg_color=T.ACCENT_SOFT, corner_radius=T.RADIUS_LG, border_width=0)
@@ -196,6 +196,28 @@ class InvoiceTab(ctk.CTkFrame):
             d_row, text="$", width=40, command=self._apply_amt_discount, **T.button_kwargs(height=T.BTN_HEIGHT),
         ).pack(side="left", padx=(6, 0))
 
+        timing_row = ctk.CTkFrame(d_inner, fg_color="transparent")
+        timing_row.pack(fill="x", pady=(12, 0))
+        ctk.CTkLabel(timing_row, text="Apply", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).pack(
+            side="left", padx=(0, 10)
+        )
+        default_timing = get_setting("discount_timing", "before_tax") or "before_tax"
+        self.discount_timing = ctk.StringVar(value=default_timing)
+        for value, label in (("before_tax", "Before tax"), ("after_tax", "After tax")):
+            ctk.CTkRadioButton(
+                timing_row,
+                text=label,
+                variable=self.discount_timing,
+                value=value,
+                command=self.refresh_items,
+                font=T.FONT_CAPTION,
+                text_color=T.TEXT,
+                fg_color=T.ACCENT,
+                border_color=T.BORDER,
+                radiobutton_width=18,
+                radiobutton_height=18,
+            ).pack(side="left", padx=(0, 12))
+
         # Compatibility alias used by older helpers
         self.discount_entry = self.discount_pct_entry
 
@@ -222,7 +244,7 @@ class InvoiceTab(ctk.CTkFrame):
 
         legend = ctk.CTkLabel(
             dock,
-            text="F1 New  ·  F2 Products  ·  F3 Sales  ·  F4 Setup  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print",
+            text="F1 New  ·  F2 Products  ·  F3 Sales  ·  F4 Setup  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print  ·  then F7 Cash / F8 Card / F12 Confirm",
             font=T.FONT_CAPTION, text_color=T.TEXT_TERTIARY, anchor="w",
         )
         legend.pack(fill="x", padx=14, pady=(0, 10))
@@ -461,16 +483,22 @@ class InvoiceTab(ctk.CTkFrame):
         self.tax_rate = float(get_setting("tax_rate", "0.13"))
         dtype = self.discount_type.get()
         dval = self._get_discount_value()
-        subtotal, discount_amount, tax_amount, total = compute_invoice_totals(self.items, self.tax_rate, dtype, dval)
+        timing = self.discount_timing.get() if hasattr(self, "discount_timing") else "before_tax"
+        subtotal, discount_amount, tax_amount, total = compute_invoice_totals(
+            self.items, self.tax_rate, dtype, dval, timing,
+        )
 
         self.subtotal_label.configure(text=format_currency(subtotal))
         if discount_amount > 0:
             label = f"−{format_currency(discount_amount)}"
             if dtype == "percent":
                 label += f" ({dval:g}%)"
-            self.discount_summary_label.configure(text=label)
+            when = "after tax" if timing == "after_tax" else "before tax"
+            self.discount_summary_label.configure(text=f"{label} · {when}")
+            self.discount_summary_label._title_label.configure(text="Discount")
         else:
             self.discount_summary_label.configure(text="−$0.00")
+            self.discount_summary_label._title_label.configure(text="Discount")
         self.tax_label.configure(text=format_currency(tax_amount))
         self.tax_label._title_label.configure(text=self._tax_caption())
         self.total_label.configure(text=format_currency(total))
@@ -479,7 +507,10 @@ class InvoiceTab(ctk.CTkFrame):
         self.tax_rate = float(get_setting("tax_rate", "0.13"))
         dtype = self.discount_type.get()
         dval = self._get_discount_value()
-        subtotal, discount_amount, tax_amount, total = compute_invoice_totals(self.items, self.tax_rate, dtype, dval)
+        timing = self.discount_timing.get() if hasattr(self, "discount_timing") else "before_tax"
+        subtotal, discount_amount, tax_amount, total = compute_invoice_totals(
+            self.items, self.tax_rate, dtype, dval, timing,
+        )
 
         return Invoice(
             id=None,
@@ -498,6 +529,7 @@ class InvoiceTab(ctk.CTkFrame):
             discount_type=dtype if dval > 0 else "",
             discount_value=dval,
             discount_amount=discount_amount,
+            discount_timing=timing,
         )
 
     def preview_receipt(self):
@@ -584,6 +616,8 @@ class InvoiceTab(ctk.CTkFrame):
         self.discount_pct_entry.delete(0, "end")
         self.discount_amt_entry.delete(0, "end")
         self.discount_type.set("percent")
+        if hasattr(self, "discount_timing"):
+            self.discount_timing.set(get_setting("discount_timing", "before_tax") or "before_tax")
         self.items = []
         self.payment_var.set("Cash")
         self.selected_details_var.set("")

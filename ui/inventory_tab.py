@@ -1,7 +1,15 @@
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
+from pathlib import Path
 from database import add_product, update_product, delete_product, search_products
 from models import Product
+from product_import import (
+    TEMPLATE_HEADERS,
+    ensure_templates,
+    import_products_from_file,
+    write_csv_template,
+    write_excel_template,
+)
 from utils import format_currency
 from . import theme as T
 from .dialogs import ask_yes_no
@@ -37,6 +45,20 @@ class InventoryTab(ctk.CTkFrame):
             **T.primary_button_kwargs(width=180),
         ).pack(side="left")
 
+        ctk.CTkButton(
+            inner,
+            text="Import spreadsheet",
+            command=self.import_products,
+            **T.button_kwargs(width=170),
+        ).pack(side="left", padx=(10, 0))
+
+        ctk.CTkButton(
+            inner,
+            text="Download template",
+            command=self.download_import_template,
+            **T.button_kwargs(width=170),
+        ).pack(side="left", padx=(10, 0))
+
         T.field_label(inner, "Search products").pack(side="left", padx=(24, 8))
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
@@ -45,6 +67,76 @@ class InventoryTab(ctk.CTkFrame):
         )
         self.search_entry.pack(side="left")
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_products())
+
+    def download_import_template(self):
+        """Let the user save the Excel (or CSV) template with headings filled in."""
+        path = filedialog.asksaveasfilename(
+            parent=self.winfo_toplevel(),
+            title="Save product import template",
+            defaultextension=".xlsx",
+            initialfile="product_import_template.xlsx",
+            filetypes=[
+                ("Excel spreadsheet", "*.xlsx"),
+                ("CSV (Google Sheets)", "*.csv"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not path:
+            return
+        try:
+            dest = Path(path)
+            if dest.suffix.lower() == ".csv":
+                write_csv_template(dest)
+            else:
+                if dest.suffix.lower() != ".xlsx":
+                    dest = dest.with_suffix(".xlsx")
+                write_excel_template(dest)
+            # Keep a copy in assets for packaging / docs
+            ensure_templates()
+            toast(self, f"Template saved — columns: {', '.join(TEMPLATE_HEADERS)}", kind="success")
+            self.winfo_toplevel().set_status(f"Template saved to {dest.name}")
+        except Exception as e:
+            messagebox.showerror("Could not save template", str(e), parent=self.winfo_toplevel())
+
+    def import_products(self):
+        path = filedialog.askopenfilename(
+            parent=self.winfo_toplevel(),
+            title="Import products from spreadsheet",
+            filetypes=[
+                ("Spreadsheets", "*.xlsx *.xlsm *.csv"),
+                ("Excel", "*.xlsx *.xlsm"),
+                ("CSV (Google Sheets)", "*.csv"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not path:
+            return
+        result = import_products_from_file(path)
+        self.load_products()
+        if result.errors and not result.ok_count:
+            messagebox.showerror(
+                "Import failed",
+                "\n".join(result.errors[:8]),
+                parent=self.winfo_toplevel(),
+            )
+            return
+
+        parts = []
+        if result.added:
+            parts.append(f"{result.added} added")
+        if result.updated:
+            parts.append(f"{result.updated} updated")
+        if result.skipped:
+            parts.append(f"{result.skipped} skipped")
+        summary = ", ".join(parts) if parts else "Nothing imported"
+        toast(self, summary, kind="success" if result.ok_count else "warning", title="Import complete")
+        self.winfo_toplevel().set_status(f"Import complete — {summary}")
+        if result.errors:
+            messagebox.showwarning(
+                "Some rows had problems",
+                "\n".join(result.errors[:12]),
+                parent=self.winfo_toplevel(),
+            )
 
     def create_low_stock_banner(self):
         self.banner_frame = ctk.CTkFrame(self, fg_color=T.WARNING_SOFT, corner_radius=T.RADIUS_MD)
@@ -291,14 +383,16 @@ class InventoryTab(ctk.CTkFrame):
 
         actions = ctk.CTkFrame(footer, fg_color="transparent")
         actions.pack(side="left")
+        # Uniform Save Next / Save Close — same size and weight
+        btn_style = T.success_button_kwargs(width=170, height=T.BTN_HEIGHT_LG)
         if is_new:
             ctk.CTkButton(
                 actions, text="SAVE NEXT  ·  F5", command=lambda: save(add_another=True),
-                **T.button_kwargs(width=150),
+                **btn_style,
             ).pack(side="left", padx=(0, 10))
         ctk.CTkButton(
             actions, text="SAVE CLOSE  ·  F6", command=lambda: save(add_another=False),
-            **T.success_button_kwargs(width=160),
+            **btn_style,
         ).pack(side="left")
 
         dialog.bind("<F5>", lambda e: (save(add_another=True), "break")[1] if is_new else "break")

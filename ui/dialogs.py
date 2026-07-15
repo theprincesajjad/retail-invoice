@@ -63,11 +63,11 @@ def ask_yes_no(
         dialog.destroy()
 
     ctk.CTkButton(
-        dialog._btn_frame, text=cancel_label, command=no,
-        **T.button_kwargs(width=150),
+        dialog._btn_frame, text=f"{cancel_label}  ·  Esc", command=no,
+        **T.button_kwargs(width=170),
     ).pack(side="left")
 
-    confirm_kw = T.danger_button_kwargs(width=180, height=T.BTN_HEIGHT_LG) if destructive else T.success_button_kwargs(width=180)
+    confirm_kw = T.danger_button_kwargs(width=200, height=T.BTN_HEIGHT_LG) if destructive else T.success_button_kwargs(width=200)
     if destructive:
         confirm_kw = {
             "fg_color": T.DANGER,
@@ -77,11 +77,18 @@ def ask_yes_no(
             "font": T.FONT_MEDIUM,
             "height": T.BTN_HEIGHT_LG,
             "border_width": 0,
-            "width": 180,
+            "width": 200,
         }
+    confirm_text = confirm_label if destructive else f"{confirm_label}  ·  F12"
     ctk.CTkButton(
-        dialog._btn_frame, text=confirm_label, command=yes, **confirm_kw,
+        dialog._btn_frame, text=confirm_text, command=yes, **confirm_kw,
     ).pack(side="right")
+
+    dialog.bind("<Escape>", lambda e: (no(), "break")[1])
+    if not destructive:
+        dialog.bind("<F12>", lambda e: (yes(), "break")[1])
+        dialog.bind("<Return>", lambda e: (yes(), "break")[1])
+        dialog.bind("<KP_Enter>", lambda e: (yes(), "break")[1])
 
     dialog.wait_window()
     return result["value"]
@@ -93,16 +100,21 @@ def show_info(parent, title: str, message: str, *, button_label: str = "Got it")
         dialog._btn_frame, text=button_label, command=dialog.destroy,
         **T.primary_button_kwargs(width=140),
     ).pack(side="right")
+    dialog.bind("<Escape>", lambda e: (dialog.destroy(), "break")[1])
+    dialog.bind("<Return>", lambda e: (dialog.destroy(), "break")[1])
     dialog.wait_window()
 
 
 def ask_payment_method(parent, default: str = "Cash") -> str | None:
-    """Ask Cash or Card before printing. Returns None if cancelled."""
+    """Ask Cash or Card before printing. Returns None if cancelled.
+
+    Hotkeys (2nd window after F12 Complete + Print): F7 Cash · F8 Card · Esc Cancel
+    """
     dialog = FriendlyDialog(
         parent,
         "How did they pay?",
-        "Choose Cash or Card before the receipt is printed.",
-        width=480,
+        "Choose Cash or Card before the receipt is printed.\nShortcuts: F7 Cash  ·  F8 Card  ·  Esc Cancel",
+        width=520,
     )
     result = {"value": None}
 
@@ -114,19 +126,26 @@ def ask_payment_method(parent, default: str = "Cash") -> str | None:
         dialog.destroy()
 
     ctk.CTkButton(
-        dialog._btn_frame, text="Cancel", command=cancel,
-        **T.button_kwargs(width=120),
+        dialog._btn_frame, text="Cancel  ·  Esc", command=cancel,
+        **T.button_kwargs(width=140),
     ).pack(side="left")
 
-    cash_kw = T.success_button_kwargs(width=120) if default == "Cash" else T.button_kwargs(width=120)
-    card_kw = T.success_button_kwargs(width=120) if default == "Card" else T.button_kwargs(width=120)
+    cash_kw = T.success_button_kwargs(width=140) if default == "Cash" else T.button_kwargs(width=140)
+    card_kw = T.success_button_kwargs(width=140) if default == "Card" else T.button_kwargs(width=140)
 
     ctk.CTkButton(
-        dialog._btn_frame, text="Card", command=lambda: choose("Card"), **card_kw,
+        dialog._btn_frame, text="Card  ·  F8", command=lambda: choose("Card"), **card_kw,
     ).pack(side="right", padx=(10, 0))
     ctk.CTkButton(
-        dialog._btn_frame, text="Cash", command=lambda: choose("Cash"), **cash_kw,
+        dialog._btn_frame, text="Cash  ·  F7", command=lambda: choose("Cash"), **cash_kw,
     ).pack(side="right")
+
+    dialog.bind("<Escape>", lambda e: (cancel(), "break")[1])
+    dialog.bind("<F7>", lambda e: (choose("Cash"), "break")[1])
+    dialog.bind("<F8>", lambda e: (choose("Card"), "break")[1])
+    # Enter picks the default payment method for a fast F12 → Enter → F12 flow
+    dialog.bind("<Return>", lambda e: (choose(default if default in ("Cash", "Card") else "Cash"), "break")[1])
+    dialog.bind("<KP_Enter>", lambda e: (choose(default if default in ("Cash", "Card") else "Cash"), "break")[1])
 
     dialog.wait_window()
     return result["value"]

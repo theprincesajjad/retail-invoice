@@ -14,7 +14,7 @@ Built so an 85-year-old can complete a sale, and a busy business owner can run t
 
 That’s it. A welcome wizard may appear; you can fill it in or click **Skip for now** and start selling immediately.
 
-Current release: **1.5.0**
+Current release: **1.6.0**
 
 ---
 
@@ -32,15 +32,26 @@ Nothing has to be completed before you can sell. Defaults work out of the box (1
 
 ## Features
 
-- **New Sale** — Customer info, product search, custom lines, discounts (% or $), Cash/Card/Other
+- **New Sale** — Customer info, product search, custom lines, discounts (% or $, before or after tax), Cash/Card/Other
 - **Quantity picker** — Choose how many when adding from inventory; adjust with +/− on each line
 - **Preview Receipt** — See the receipt before you print
 - **Beautiful thermal receipts** — Clear layout for Epson TM-T20 and similar printers
-- **Products** — Add/edit stock; low-stock warnings
+- **Products** — Add/edit stock; **batch import** from Excel or Google Sheets (CSV); low-stock warnings
 - **Sales History** — Today / This week / Monthly / Quarterly / Yearly; view, reprint, email
-- **Setup** — Store details, tax as a percentage, printer test, email receipts, backup your data
-- **Keyboard shortcuts** — Still available for power users (F1–F4 tabs, F12 complete sale)
+- **Setup** — Store details, tax as a percentage, default discount timing, printer test, email receipts, backup your data
+- **Keyboard shortcuts** — F1–F4 tabs, F5/F6 product save, F10 save, F11 preview, F12 complete + print, then F7/F8 pay and F12 confirm
 
+---
+
+## Batch import products
+
+1. Open the **Products** tab
+2. Click **Download template** (Excel or CSV)
+3. Fill in rows: **SKU**, **Product Name**, **Details**, **Qty**, **Price**
+4. For Google Sheets: paste into a sheet, or upload the CSV / Excel file
+5. Click **Import spreadsheet** and choose your file
+
+Rows with a matching SKU update that product; new SKUs are added.
 ---
 
 ## How to make a sale
@@ -85,8 +96,8 @@ Or let GitHub Actions build it — push a version tag:
 
 ```bash
 # Update VERSION and CHANGELOG.md, commit, then:
-git tag v1.5.0
-git push origin v1.5.0
+git tag v1.6.0
+git push origin v1.6.0
 ```
 
 That triggers [.github/workflows/release.yml](.github/workflows/release.yml), which builds `RetailInvoice-x.x.x-Windows.exe` and publishes a GitHub Release.

@@ -23,8 +23,8 @@ _TAB_KEYS = {
 }
 
 SHORTCUT_HELP = {
-    TAB_HOME: "F1 New  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print",
-    TAB_INVENTORY: "Alt+N add product  ·  F5 Save Next  ·  F6 Save Close  ·  F1–F4 tabs",
+    TAB_HOME: "F1 New  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print  ·  F7/F8 pay  ·  F12 confirm",
+    TAB_INVENTORY: "Alt+N add  ·  Import spreadsheet  ·  F5 Save Next  ·  F6 Save Close  ·  F1–F4 tabs",
     TAB_REPORTS: "Alt+S search  ·  Alt+R refresh  ·  F1–F4 tabs",
     TAB_SETTINGS: "Store details, printer, and receipt design",
 }
