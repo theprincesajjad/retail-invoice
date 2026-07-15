@@ -102,3 +102,61 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_p
     px = parent.winfo_rootx() + max(0, (parent.winfo_width() - 480) // 2)
     py = parent.winfo_rooty() + max(0, (parent.winfo_height() - 720) // 2)
     dialog.geometry(f"480x720+{px}+{py}")
+
+
+def show_text_viewer(parent, title: str, body: str, print_callback=None):
+    """Preview a monospace document (e.g. inventory list) with optional print."""
+    dialog = ctk.CTkToplevel(parent)
+    dialog.title(title)
+    dialog.geometry("520x720")
+    dialog.minsize(420, 560)
+    dialog.configure(fg_color=T.BG)
+    dialog.transient(parent)
+    dialog.grab_set()
+
+    card = ctk.CTkFrame(dialog, **T.card_kwargs())
+    card.pack(fill="both", expand=True, padx=24, pady=24)
+
+    ctk.CTkLabel(card, text=title, font=T.FONT_HEADLINE, text_color=T.TEXT).pack(
+        anchor="w", padx=24, pady=(24, 8)
+    )
+
+    frame = ctk.CTkFrame(card, fg_color="#FFFEF9", corner_radius=T.RADIUS_SM, border_width=1, border_color=T.BORDER_LIGHT)
+    frame.pack(fill="both", expand=True, padx=24, pady=(0, 12))
+
+    textbox = ctk.CTkTextbox(
+        frame,
+        font=("Courier New", 14),
+        fg_color="#FFFEF9",
+        text_color=T.TEXT,
+        border_width=0,
+        corner_radius=T.RADIUS_SM,
+        wrap="none",
+    )
+    textbox.pack(fill="both", expand=True, padx=12, pady=12)
+    textbox.insert("1.0", body)
+    textbox.configure(state="disabled")
+
+    def do_print():
+        if not print_callback:
+            return
+        ok, msg = print_callback()
+        if ok:
+            parent.set_status(msg)
+            toast(parent, msg, kind="success")
+        else:
+            toast(parent, msg, kind="error", title="Print failed")
+            messagebox.showerror("Print failed", msg)
+
+    footer = ctk.CTkFrame(card, fg_color="transparent")
+    footer.pack(fill="x", padx=24, pady=(0, 24))
+    ctk.CTkButton(footer, text="Close", command=dialog.destroy, **T.button_kwargs(width=100)).pack(side="right")
+    if print_callback:
+        ctk.CTkButton(
+            footer, text="Print list", command=do_print, **T.success_button_kwargs(width=140),
+        ).pack(side="right", padx=(0, 10))
+
+    dialog.update_idletasks()
+    px = parent.winfo_rootx() + max(0, (parent.winfo_width() - 520) // 2)
+    py = parent.winfo_rooty() + max(0, (parent.winfo_height() - 720) // 2)
+    dialog.geometry(f"520x720+{px}+{py}")

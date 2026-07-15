@@ -211,8 +211,31 @@ class SettingsTab(ctk.CTkFrame):
             **T.button_kwargs(width=150),
         ).pack(side="left")
 
+        cat_frame = ctk.CTkFrame(grid, **T.card_kwargs())
+        cat_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=8)
+        cat_inner = ctk.CTkFrame(cat_frame, fg_color="transparent")
+        cat_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
+        T.section_title(
+            cat_inner,
+            "Product categories",
+            "Used on products and inventory spreadsheets — add your own anytime",
+        ).pack(anchor="w", pady=(0, 12))
+
+        self.category_list_frame = ctk.CTkFrame(cat_inner, fg_color="transparent")
+        self.category_list_frame.pack(fill="x", pady=(0, 10))
+
+        add_row = ctk.CTkFrame(cat_inner, fg_color="transparent")
+        add_row.pack(fill="x")
+        self.new_category_entry = ctk.CTkEntry(
+            add_row, placeholder_text="New category name…", **T.entry_kwargs(width=240),
+        )
+        self.new_category_entry.pack(side="left", padx=(0, 10))
+        ctk.CTkButton(
+            add_row, text="Add category", command=self._add_category, **T.button_kwargs(width=140),
+        ).pack(side="left")
+
         email_frame = ctk.CTkFrame(grid, **T.card_kwargs())
-        email_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=8)
+        email_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=8)
         em_inner = ctk.CTkFrame(email_frame, fg_color="transparent")
         em_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
         T.section_title(
@@ -258,7 +281,7 @@ class SettingsTab(ctk.CTkFrame):
             self.entries[key] = e
 
         backup_frame = ctk.CTkFrame(grid, **T.card_kwargs())
-        backup_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=8)
+        backup_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=8)
         bk_inner = ctk.CTkFrame(backup_frame, fg_color="transparent")
         bk_inner.pack(fill="x", padx=T.PAD_CARD, pady=T.PAD_CARD)
         T.section_title(bk_inner, "Backup your data", "Save a copy of your sales and inventory to a safe place").pack(anchor="w", pady=(0, 12))
@@ -422,7 +445,63 @@ class SettingsTab(ctk.CTkFrame):
         self.header_spacing_var.set(settings.get("receipt_header_spacing", "normal") or "normal")
         for key, var in self.design_toggles.items():
             var.set(str(settings.get(key, "1")).strip() not in ("0", "false", "False", ""))
+        self._refresh_category_list()
         self.refresh_receipt_preview()
+
+    def _refresh_category_list(self):
+        from categories import get_product_categories
+
+        for w in self.category_list_frame.winfo_children():
+            w.destroy()
+        cats = get_product_categories()
+        if not cats:
+            ctk.CTkLabel(
+                self.category_list_frame,
+                text="No categories yet",
+                font=T.FONT, text_color=T.TEXT_TERTIARY,
+            ).pack(anchor="w")
+            return
+        for cat in cats:
+            row = ctk.CTkFrame(self.category_list_frame, fg_color=T.SURFACE_ALT, corner_radius=T.RADIUS_SM)
+            row.pack(fill="x", pady=3)
+            ctk.CTkLabel(row, text=cat, font=T.FONT, text_color=T.TEXT, anchor="w").pack(
+                side="left", padx=12, pady=8
+            )
+            ctk.CTkButton(
+                row,
+                text="Remove",
+                width=80,
+                command=lambda c=cat: self._remove_category(c),
+                **T.button_kwargs(height=T.BTN_HEIGHT_SM, text_color=T.DANGER),
+            ).pack(side="right", padx=8, pady=4)
+
+    def _add_category(self):
+        from categories import get_product_categories, save_product_categories
+
+        name = self.new_category_entry.get().strip()
+        if not name:
+            toast(self, "Enter a category name first.", kind="warning")
+            return
+        cats = get_product_categories()
+        if any(c.lower() == name.lower() for c in cats):
+            toast(self, f"“{name}” is already in the list.", kind="info")
+            return
+        cats.append(name)
+        save_product_categories(cats)
+        self.new_category_entry.delete(0, "end")
+        self._refresh_category_list()
+        toast(self, f"Added category “{name}”", kind="success")
+
+    def _remove_category(self, name: str):
+        from categories import get_product_categories, save_product_categories
+
+        cats = [c for c in get_product_categories() if c.lower() != name.lower()]
+        if not cats:
+            toast(self, "Keep at least one category.", kind="warning")
+            return
+        save_product_categories(cats)
+        self._refresh_category_list()
+        toast(self, f"Removed “{name}”", kind="info")
 
     def save_settings(self):
         try:

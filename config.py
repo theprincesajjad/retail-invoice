@@ -29,6 +29,7 @@ DEFAULT_SETTINGS = {
     "receipt_footer": "All Sales are Final. No Returns or Exchanges.",
     "tax_rate": "0.13",
     "discount_timing": "before_tax",
+    "product_categories": '["Cell Phones","Laptops","Desktops","Monitors","Printers","Accessories","Other"]',
     "logo_path": str(ASSETS_DIR / "logo.png"),
     "printer_name": "",
     "receipt_width": "80mm",

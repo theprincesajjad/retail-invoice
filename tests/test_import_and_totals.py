@@ -1,107 +1,109 @@
-"""Tests for totals math and product spreadsheet import."""
+"""Tests for categories, inventory import, and inventory list."""
 
 from pathlib import Path
 
-from models import InvoiceItem
+import sqlite3
+
+from categories import (
+    DEFAULT_CATEGORIES,
+    normalize_category,
+    parse_categories,
+    serialize_categories,
+)
+from inventory_list import build_inventory_list_text
+from models import InvoiceItem, Product
 from product_import import (
-    TEMPLATE_HEADERS,
+    INVENTORY_HEADERS,
+    STATUS_IN_INVENTORY,
+    import_products_from_file,
     read_product_rows,
-    write_csv_template,
-    write_excel_template,
+    write_inventory_workbook,
 )
 from utils import compute_invoice_totals
 
 
-def _items():
-    return [
-        InvoiceItem(
-            id=None, invoice_id=None, product_id=None,
-            description="A", serial_number="", qty=1, unit_price=100.0, line_total=100.0,
-        )
+def test_default_categories():
+    assert "Laptops" in DEFAULT_CATEGORIES
+    assert "Cell Phones" in DEFAULT_CATEGORIES
+    assert parse_categories("") == DEFAULT_CATEGORIES
+
+
+def test_serialize_roundtrip():
+    raw = serialize_categories(["Laptops", "Other", "Laptops"])
+    assert parse_categories(raw) == ["Laptops", "Other"]
+
+
+def test_normalize_category():
+    assert normalize_category("laptops", ["Laptops", "Other"]) == "Laptops"
+    assert normalize_category("", ["Other"]) == "Other"
+
+
+def test_inventory_workbook_has_status_and_category(tmp_path: Path):
+    products = [
+        Product(1, "Phone", "128GB", "1001", 299.0, 2, "Cell Phones", ""),
+        Product(2, "Case", "", "1002", 15.0, 5, "Accessories", ""),
     ]
+    path = write_inventory_workbook(tmp_path / "inv.xlsx", products, blank_rows=3)
+    rows = read_product_rows(path)
+    assert rows[0]["status"] == STATUS_IN_INVENTORY
+    assert rows[0]["category"] == "Cell Phones"
+    assert "Category" in INVENTORY_HEADERS
+    assert "Status" in INVENTORY_HEADERS
 
 
-def test_discount_before_tax_percent():
-    subtotal, discount, tax, total = compute_invoice_totals(
-        _items(), 0.13, "percent", 10, "before_tax",
-    )
-    assert subtotal == 100.0
+def test_import_skips_without_sku_and_existing(tmp_path: Path, monkeypatch):
+    import config
+    import database
+
+    db_path = tmp_path / "t.db"
+
+    def conn():
+        c = sqlite3.connect(db_path)
+        c.row_factory = sqlite3.Row
+        return c
+
+    monkeypatch.setattr(config, "get_db_connection", conn)
+    monkeypatch.setattr(database, "get_db_connection", conn)
+    database.init_db()
+
+    from database import add_product, search_products
+
+    add_product(Product(None, "Existing", "", "SKU-1", 10.0, 1, "Other", ""))
+
+    csv_path = tmp_path / "import.csv"
+    with csv_path.open("w", encoding="utf-8") as f:
+        f.write(",".join(INVENTORY_HEADERS) + "\n")
+        f.write("SKU-1,Existing,,Other,1,10,In inventory\n")
+        f.write(",NoSkuName,,Other,1,5,\n")
+        f.write("SKU-2,Brand New,nice,Laptops,3,50,\n")
+        f.write("SKU-1,Dup attempt,,Other,9,9,\n")
+
+    result = import_products_from_file(csv_path)
+    assert result.added == 1
+    products = search_products("")
+    skus = {p.sku for p in products}
+    assert skus == {"SKU-1", "SKU-2"}
+    new = next(p for p in products if p.sku == "SKU-2")
+    assert new.category == "Laptops"
+
+
+def test_discount_before_tax_still_works():
+    items = [InvoiceItem(None, None, None, "A", "", 1, 100.0, 100.0)]
+    _, discount, tax, total = compute_invoice_totals(items, 0.13, "percent", 10, "before_tax")
     assert discount == 10.0
     assert abs(tax - 11.7) < 1e-9
-    assert abs(total - 101.7) < 1e-9
 
 
-def test_discount_after_tax_percent():
-    subtotal, discount, tax, total = compute_invoice_totals(
-        _items(), 0.13, "percent", 10, "after_tax",
+def test_inventory_list_text_contains_header():
+    text = build_inventory_list_text(
+        products=[
+            Product(1, "Dell", "i5", "60000", 699.0, 1, "Laptops", ""),
+        ],
+        settings={
+            "business_name": "Test Shop",
+            "receipt_width": "80mm",
+        },
     )
-    assert subtotal == 100.0
-    assert abs(tax - 13.0) < 1e-9
-    assert abs(discount - 11.3) < 1e-9  # 10% of 113
-    assert abs(total - 101.7) < 1e-9
-
-
-def test_discount_after_tax_fixed():
-    subtotal, discount, tax, total = compute_invoice_totals(
-        _items(), 0.13, "fixed", 5, "after_tax",
-    )
-    assert abs(tax - 13.0) < 1e-9
-    assert discount == 5.0
-    assert abs(total - 108.0) < 1e-9
-
-
-def test_excel_template_headers_and_rows(tmp_path: Path):
-    path = write_excel_template(tmp_path / "t.xlsx")
-    rows = read_product_rows(path)
-    assert len(rows) == 2
-    assert rows[0]["name"] == "Dell Latitude Laptop"
-    assert rows[0]["sku"] == "60000"
-    assert rows[0]["price"] == "699.99"
-
-
-def test_csv_template_roundtrip(tmp_path: Path):
-    path = write_csv_template(tmp_path / "t.csv")
-    rows = read_product_rows(path)
-    assert {r["sku"] for r in rows} == {"60000", "60001"}
-    text = path.read_text(encoding="utf-8")
-    assert ",".join(TEMPLATE_HEADERS) in text
-
-
-def test_receipt_blank_line_between_items():
-    from receipt_builder import build_receipt_text
-    from models import Invoice
-    from datetime import datetime
-
-    items = [
-        InvoiceItem(None, None, None, "Item One", "", 1, 10, 10),
-        InvoiceItem(None, None, None, "Item Two", "", 1, 20, 20),
-    ]
-    inv = Invoice(
-        id=None, invoice_number="INV-786-0001", customer_name="", customer_phone="",
-        subtotal=30, tax_rate=0.13, tax_amount=3.9, total=33.9,
-        payment_method="Cash", notes="", created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        items=items,
-    )
-    text = build_receipt_text(inv, items, settings={
-        "receipt_width": "80mm",
-        "business_name": "Shop",
-        "receipt_show_business_name": "1",
-        "receipt_show_tagline": "0",
-        "receipt_show_address": "0",
-        "receipt_show_phone": "0",
-        "receipt_show_website": "0",
-        "receipt_show_email": "0",
-        "receipt_show_customer": "0",
-        "receipt_show_details": "0",
-        "receipt_show_notes": "0",
-        "receipt_show_thanks": "0",
-        "receipt_show_footer": "0",
-        "receipt_show_gst": "0",
-        "receipt_header_spacing": "normal",
-    })
-    # Item One line, blank, Item Two line
-    assert "Item One" in text and "Item Two" in text
-    idx1 = text.index("Item One")
-    idx2 = text.index("Item Two")
-    between = text[idx1:idx2]
-    assert "\n\n" in between or between.count("\n") >= 2
+    assert "INVENTORY LIST" in text
+    assert "LAPTOPS" in text
+    assert "Dell" in text

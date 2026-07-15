@@ -308,3 +308,69 @@ def print_test_receipt() -> tuple[bool, str]:
     settings = get_all_settings()
     invoice, items = sample_receipt_invoice(settings)
     return print_receipt(invoice, items)
+
+
+def print_text_document(title: str, body: str) -> tuple[bool, str]:
+    """Print a plain monospace document (inventory list, etc.) to the receipt printer."""
+    settings = get_all_settings()
+    requested = settings.get("printer_name", "").strip()
+    printer_name = resolve_printer_name(requested)
+
+    if not printer_name:
+        return False, "No printer selected. Open Setup and choose your Epson TM-T20."
+
+    if platform.system() != "Windows":
+        return False, "Printing is only supported on Windows."
+
+    installed = _list_windows_printers()
+    if installed and printer_name not in installed:
+        return False, f"Printer not found: {printer_name}"
+
+    text = (body or "").rstrip() + "\n\n\n"
+    data = ESC_INIT + _line_spacing(settings) + ESC_ALIGN_LEFT + ESC_CHAR_NORMAL
+    data += _encode_text(text)
+    data += ESC_FEED_LINES + ESC_CUT
+
+    errors: list[str] = []
+    try:
+        from escpos.printer import Win32Raw
+
+        printer = Win32Raw(printer_name)
+        printer._raw(ESC_INIT + _line_spacing(settings))
+        printer.set(align="left", height=1, width=1)
+        printer.text(text)
+        try:
+            printer.cut()
+        except Exception as e:
+            logging.warning(f"Cut command skipped: {e}")
+        printer.close()
+        return True, f"Printed {title}"
+    except Exception as e:
+        errors.append(f"escpos: {e}")
+        logging.error(f"escpos inventory print failed: {e}")
+
+    try:
+        datatype = _get_raw_datatype(printer_name)
+        ok, msg = _print_bytes_win32(printer_name, data, datatype)
+        if ok:
+            return True, f"Printed {title}"
+        errors.append(f"RAW ({datatype}): {msg}")
+    except Exception as e:
+        errors.append(f"RAW: {e}")
+
+    try:
+        ok, msg = _print_bytes_win32(printer_name, _encode_text(text), "TEXT")
+        if ok:
+            return True, f"Printed {title}"
+        errors.append(f"TEXT: {msg}")
+    except Exception as e:
+        errors.append(f"TEXT: {e}")
+
+    detail = errors[0] if errors else "Unknown print error"
+    return False, f"Could not print to '{printer_name}'. {detail}"
+
+
+def print_inventory_list() -> tuple[bool, str]:
+    from inventory_list import build_inventory_list_text
+
+    return print_text_document("Inventory list", build_inventory_list_text())

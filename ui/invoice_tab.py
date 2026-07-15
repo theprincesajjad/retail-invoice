@@ -244,7 +244,7 @@ class InvoiceTab(ctk.CTkFrame):
 
         legend = ctk.CTkLabel(
             dock,
-            text="F1 New  ·  F2 Products  ·  F3 Sales  ·  F4 Setup  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print  ·  then F7 Cash / F8 Card / F12 Confirm",
+            text="F1 New  ·  F2 Products  ·  F3 Reports  ·  F4 Setup  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print  ·  then F7 Cash / F8 Card / F12 Confirm",
             font=T.FONT_CAPTION, text_color=T.TEXT_TERTIARY, anchor="w",
         )
         legend.pack(fill="x", padx=14, pady=(0, 10))
