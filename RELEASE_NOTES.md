@@ -1,8 +1,10 @@
-## Retail Invoice 1.6.0-beta
+## Retail Invoice 1.6.0
+
+Download `RetailInvoice-1.6.0-Windows.exe`, double-click, and go.
 
 ### What’s new
 
-- **Batch product import** — Download an Excel/CSV template (SKU, Product Name, Details, Qty, Price), fill it in (or use Google Sheets), then Import on the Products tab
+- **Batch product import** — On Products, download an Excel/CSV template (SKU, Product Name, Details, Qty, Price), fill it in (or use Google Sheets), then Import
 - **Discount before or after tax** on New Sale (default in Setup)
 - **Scrollable totals / notes** rail for 125% Windows display scaling
 - Uniform **Save Next (F5)** / **Save Close (F6)** on Add Product

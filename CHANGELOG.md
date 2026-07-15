@@ -2,7 +2,7 @@
 
 All notable changes to Retail Invoice are documented here.
 
-## [1.6.0-beta] — 2026-07-15
+## [1.6.0] — 2026-07-15
 
 ### Products
 
