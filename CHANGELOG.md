@@ -2,6 +2,23 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.7.0-beta] — 2026-07-15
+
+### Products & inventory spreadsheet
+
+- Product **categories**: Cell Phones, Laptops, Desktops, Monitors, Printers, Accessories, Other
+- Add more categories anytime in **Setup → Product categories**
+- **Download inventory** replaces Download template — exports current stock with **Status = In inventory**
+- Spreadsheet columns: SKU, Product Name, Details, Category, Qty, Price, Status
+- **Import** only adds **new** rows that have a SKU filled in (skips In inventory / existing SKUs)
+
+### Reports
+
+- Renamed **Sales History → Reports**
+- **Print inventory** — preview and print a categorized inventory list
+
+---
+
 ## [1.6.0] — 2026-07-15
 
 ### Products

@@ -12,7 +12,7 @@ from . import theme as T
 
 TAB_HOME = "New Sale"
 TAB_INVENTORY = "Products"
-TAB_REPORTS = "Sales History"
+TAB_REPORTS = "Reports"
 TAB_SETTINGS = "Setup"
 
 _TAB_KEYS = {
@@ -24,9 +24,9 @@ _TAB_KEYS = {
 
 SHORTCUT_HELP = {
     TAB_HOME: "F1 New  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print  ·  F7/F8 pay  ·  F12 confirm",
-    TAB_INVENTORY: "Alt+N add  ·  Import spreadsheet  ·  F5 Save Next  ·  F6 Save Close  ·  F1–F4 tabs",
-    TAB_REPORTS: "Alt+S search  ·  Alt+R refresh  ·  F1–F4 tabs",
-    TAB_SETTINGS: "Store details, printer, and receipt design",
+    TAB_INVENTORY: "Alt+N add  ·  Download inventory  ·  Import  ·  F5/F6 save  ·  F1–F4 tabs",
+    TAB_REPORTS: "Alt+S search  ·  Alt+R refresh  ·  Print inventory  ·  F1–F4 tabs",
+    TAB_SETTINGS: "Store details, categories, printer, and receipt design",
 }
 
 
@@ -38,7 +38,7 @@ def get_app_version() -> str:
     try:
         return (base / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return "1.5.0"
+        return "1.7.0"
 
 
 class App(ctk.CTk):

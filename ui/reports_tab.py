@@ -61,12 +61,29 @@ class ReportsTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             inner, text="Refresh", command=self.load_invoices, **T.button_kwargs(width=110),
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            inner, text="Print inventory", command=self.print_inventory, **T.button_kwargs(width=150),
         ).pack(side="left")
 
     def _show_today(self):
         self.period_var.set("Today")
         self.on_filter_change()
 
+    def print_inventory(self):
+        from inventory_list import build_inventory_list_text
+        from printer import print_inventory_list
+        from .receipt_viewer import show_text_viewer
+
+        text = build_inventory_list_text()
+        # Preview first so shops without a printer can still review the list
+        show_text_viewer(
+            self.winfo_toplevel(),
+            title="Inventory list",
+            body=text,
+            print_callback=print_inventory_list,
+        )
     def create_summary(self):
         self.summary_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.summary_frame.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))

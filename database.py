@@ -149,9 +149,9 @@ def search_products(query=""):
         search_query = f"%{query}%"
         cursor.execute('''
             SELECT * FROM products 
-            WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ?
+            WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ? OR category LIKE ?
             ORDER BY name
-        ''', (search_query, search_query, search_query))
+        ''', (search_query, search_query, search_query, search_query))
         rows = cursor.fetchall()
         return [Product(**dict(row)) for row in rows]
 

@@ -1,14 +1,13 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from pathlib import Path
+from categories import get_product_categories, normalize_category
 from database import add_product, update_product, delete_product, search_products
 from models import Product
 from product_import import (
-    TEMPLATE_HEADERS,
-    ensure_templates,
+    INVENTORY_HEADERS,
+    export_inventory,
     import_products_from_file,
-    write_csv_template,
-    write_excel_template,
 )
 from utils import format_currency
 from . import theme as T
@@ -47,15 +46,15 @@ class InventoryTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             inner,
-            text="Import spreadsheet",
-            command=self.import_products,
+            text="Download inventory",
+            command=self.download_inventory,
             **T.button_kwargs(width=170),
         ).pack(side="left", padx=(10, 0))
 
         ctk.CTkButton(
             inner,
-            text="Download template",
-            command=self.download_import_template,
+            text="Import spreadsheet",
+            command=self.import_products,
             **T.button_kwargs(width=170),
         ).pack(side="left", padx=(10, 0))
 
@@ -63,18 +62,18 @@ class InventoryTab(ctk.CTkFrame):
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
             inner, textvariable=self.search_var,
-            placeholder_text="Name, code, or details…", **T.entry_kwargs(300),
+            placeholder_text="Name, code, details, category…", **T.entry_kwargs(260),
         )
         self.search_entry.pack(side="left")
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_products())
 
-    def download_import_template(self):
-        """Let the user save the Excel (or CSV) template with headings filled in."""
+    def download_inventory(self):
+        """Export current inventory with Status=In inventory for spreadsheet sync."""
         path = filedialog.asksaveasfilename(
             parent=self.winfo_toplevel(),
-            title="Save product import template",
+            title="Download inventory spreadsheet",
             defaultextension=".xlsx",
-            initialfile="product_import_template.xlsx",
+            initialfile="inventory.xlsx",
             filetypes=[
                 ("Excel spreadsheet", "*.xlsx"),
                 ("CSV (Google Sheets)", "*.csv"),
@@ -84,24 +83,22 @@ class InventoryTab(ctk.CTkFrame):
         if not path:
             return
         try:
-            dest = Path(path)
-            if dest.suffix.lower() == ".csv":
-                write_csv_template(dest)
-            else:
-                if dest.suffix.lower() != ".xlsx":
-                    dest = dest.with_suffix(".xlsx")
-                write_excel_template(dest)
-            # Keep a copy in assets for packaging / docs
-            ensure_templates()
-            toast(self, f"Template saved — columns: {', '.join(TEMPLATE_HEADERS)}", kind="success")
-            self.winfo_toplevel().set_status(f"Template saved to {dest.name}")
+            dest = export_inventory(path)
+            count = len(search_products(""))
+            toast(
+                self,
+                f"{count} products · Status = In inventory. Add new rows, then Import.",
+                kind="success",
+                title="Inventory downloaded",
+            )
+            self.winfo_toplevel().set_status(f"Inventory saved to {Path(dest).name}")
         except Exception as e:
-            messagebox.showerror("Could not save template", str(e), parent=self.winfo_toplevel())
+            messagebox.showerror("Could not download inventory", str(e), parent=self.winfo_toplevel())
 
     def import_products(self):
         path = filedialog.askopenfilename(
             parent=self.winfo_toplevel(),
-            title="Import products from spreadsheet",
+            title="Import new products from spreadsheet",
             filetypes=[
                 ("Spreadsheets", "*.xlsx *.xlsm *.csv"),
                 ("Excel", "*.xlsx *.xlsm"),
@@ -111,7 +108,7 @@ class InventoryTab(ctk.CTkFrame):
         )
         if not path:
             return
-        result = import_products_from_file(path)
+        result = import_products_from_file(path, new_only=True)
         self.load_products()
         if result.errors and not result.ok_count:
             messagebox.showerror(
@@ -123,11 +120,9 @@ class InventoryTab(ctk.CTkFrame):
 
         parts = []
         if result.added:
-            parts.append(f"{result.added} added")
-        if result.updated:
-            parts.append(f"{result.updated} updated")
+            parts.append(f"{result.added} new added")
         if result.skipped:
-            parts.append(f"{result.skipped} skipped")
+            parts.append(f"{result.skipped} skipped (already in inventory or no SKU)")
         summary = ", ".join(parts) if parts else "Nothing imported"
         toast(self, summary, kind="success" if result.ok_count else "warning", title="Import complete")
         self.winfo_toplevel().set_status(f"Import complete — {summary}")
@@ -156,8 +151,8 @@ class InventoryTab(ctk.CTkFrame):
         self.table_frame = ctk.CTkScrollableFrame(card, fg_color=T.SURFACE, corner_radius=0)
         self.table_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
 
-        self.headers = ["Code", "Product name", "Details", "In stock", "Price", ""]
-        self.widths = [100, 260, 140, 80, 100, 160]
+        self.headers = ["Code", "Product name", "Category", "Details", "In stock", "Price", ""]
+        self.widths = [90, 220, 110, 130, 80, 90, 160]
 
         header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.SURFACE_ALT, corner_radius=0)
         header_frame.pack(fill="x", padx=12, pady=(12, 4))
@@ -171,7 +166,8 @@ class InventoryTab(ctk.CTkFrame):
         for widget in self.rows_frame.winfo_children():
             widget.destroy()
 
-        products = search_products(self.search_var.get().strip())
+        query = self.search_var.get().strip()
+        products = search_products(query)
 
         low_stock = [p for p in products if 0 < p.qty <= self.LOW_STOCK_THRESHOLD]
         if low_stock:
@@ -185,7 +181,7 @@ class InventoryTab(ctk.CTkFrame):
         if not products:
             ctk.CTkLabel(
                 self.rows_frame,
-                text="No products yet — click \"Add new product\" to get started",
+                text="No products yet — add one or Download inventory / Import spreadsheet",
                 font=T.FONT, text_color=T.TEXT_TERTIARY,
             ).pack(pady=40)
             return
@@ -207,13 +203,14 @@ class InventoryTab(ctk.CTkFrame):
             for text, width in [
                 (p.sku or "—", self.widths[0]),
                 (p.name, self.widths[1]),
-                (p.serial_number or "—", self.widths[2]),
-                (qty_text, self.widths[3]),
-                (format_currency(p.price), self.widths[4]),
+                (p.category or "Other", self.widths[2]),
+                (p.serial_number or "—", self.widths[3]),
+                (qty_text, self.widths[4]),
+                (format_currency(p.price), self.widths[5]),
             ]:
                 ctk.CTkLabel(row, text=text, width=width, anchor="w", font=T.FONT, text_color=color).pack(side="left", padx=6, pady=10)
 
-            actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[5])
+            actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[6])
             actions.pack(side="left", padx=6)
             ctk.CTkButton(actions, text="Edit", width=70, command=lambda prod=p: self.show_product_dialog(prod), **T.button_kwargs(height=T.BTN_HEIGHT_SM)).pack(side="left", padx=3)
             ctk.CTkButton(actions, text="Delete", width=76, command=lambda prod=p: self.delete_product(prod), **T.button_kwargs(height=T.BTN_HEIGHT_SM, text_color=T.DANGER)).pack(side="left", padx=3)
@@ -244,12 +241,13 @@ class InventoryTab(ctk.CTkFrame):
 
         is_new = product is None
         parent = self.winfo_toplevel()
+        categories = get_product_categories()
 
         dialog = ctk.CTkToplevel(parent)
         self._product_dialog = dialog
         dialog.title("Add product" if is_new else "Edit product")
 
-        width, height = 520, 360
+        width, height = 540, 420
         dialog.configure(fg_color=T.BG)
         dialog.resizable(False, False)
         dialog.geometry(f"{width}x{height}")
@@ -272,7 +270,7 @@ class InventoryTab(ctk.CTkFrame):
         body.grid_columnconfigure(1, weight=0)
         body.grid_columnconfigure(2, weight=0)
 
-        # Top row: PRODUCT SKU | PRICE | QTY (compact)
+        # Top row: PRODUCT SKU | PRICE | QTY
         ctk.CTkLabel(body, text="PRODUCT SKU", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=0, column=0, sticky="w", padx=(0, 10)
         )
@@ -289,28 +287,28 @@ class InventoryTab(ctk.CTkFrame):
         qty_entry = ctk.CTkEntry(body, placeholder_text="1", **T.entry_kwargs(width=70))
         qty_entry.grid(row=1, column=2, sticky="w", pady=(4, 14))
 
-        # Full-width name + details
         ctk.CTkLabel(body, text="PRODUCT NAME", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=2, column=0, columnspan=3, sticky="w"
         )
         name_entry = ctk.CTkEntry(body, placeholder_text="What is this product called?", **T.entry_kwargs())
         name_entry.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(4, 14))
 
-        ctk.CTkLabel(body, text="DETAILS", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+        ctk.CTkLabel(body, text="CATEGORY", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=4, column=0, columnspan=3, sticky="w"
+        )
+        category_var = ctk.StringVar(value="Other")
+        category_combo = ctk.CTkComboBox(
+            body, variable=category_var, values=categories or ["Other"], **T.combo_kwargs(width=220),
+        )
+        category_combo.grid(row=5, column=0, columnspan=3, sticky="w", pady=(4, 14))
+
+        ctk.CTkLabel(body, text="DETAILS", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+            row=6, column=0, columnspan=3, sticky="w"
         )
         details_entry = ctk.CTkEntry(
             body, placeholder_text="Specs, S/N, or other text for the invoice", **T.entry_kwargs(),
         )
-        details_entry.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(4, 8))
-
-        entries = {
-            "sku": sku_entry,
-            "price": price_entry,
-            "qty": qty_entry,
-            "name": name_entry,
-            "serial_number": details_entry,
-        }
+        details_entry.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(4, 8))
 
         footer = ctk.CTkFrame(card, fg_color="transparent")
         footer.pack(fill="x", padx=20, pady=(4, 18))
@@ -321,9 +319,14 @@ class InventoryTab(ctk.CTkFrame):
             details_entry.insert(0, product.serial_number or "")
             price_entry.insert(0, str(product.price))
             qty_entry.insert(0, str(product.qty))
+            cat = normalize_category(product.category or "Other", categories)
+            if cat not in categories:
+                category_combo.configure(values=categories + [cat])
+            category_var.set(cat)
         else:
             qty_entry.insert(0, "1")
             price_entry.insert(0, "0.00")
+            category_var.set("Other" if "Other" in categories else (categories[0] if categories else "Other"))
 
         def save(add_another=False):
             try:
@@ -342,7 +345,7 @@ class InventoryTab(ctk.CTkFrame):
                     sku=sku_entry.get().strip(),
                     price=price,
                     qty=qty,
-                    category="",
+                    category=normalize_category(category_var.get(), get_product_categories()),
                     created_at="",
                 )
 
@@ -383,7 +386,6 @@ class InventoryTab(ctk.CTkFrame):
 
         actions = ctk.CTkFrame(footer, fg_color="transparent")
         actions.pack(side="left")
-        # Uniform Save Next / Save Close — same size and weight
         btn_style = T.success_button_kwargs(width=170, height=T.BTN_HEIGHT_LG)
         if is_new:
             ctk.CTkButton(

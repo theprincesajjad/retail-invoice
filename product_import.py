@@ -1,4 +1,10 @@
-"""Batch import products from Excel (.xlsx) or CSV (Google Sheets export)."""
+"""Inventory spreadsheet download / import (Excel + CSV).
+
+Workflow:
+  1. Download inventory → current products with Status = "In inventory"
+  2. Add new rows (fill SKU + name + …); leave Status blank or "New"
+  3. Import → only rows with a SKU that are not already in inventory are added
+"""
 
 from __future__ import annotations
 
@@ -6,10 +12,25 @@ import csv
 from pathlib import Path
 from typing import Iterable
 
+from categories import get_product_categories, normalize_category
 from models import Product
 
-# Canonical template headings (row 1). Accept common aliases when importing.
-TEMPLATE_HEADERS = ["SKU", "Product Name", "Details", "Qty", "Price"]
+# Canonical headings (row 1)
+INVENTORY_HEADERS = [
+    "SKU",
+    "Product Name",
+    "Details",
+    "Category",
+    "Qty",
+    "Price",
+    "Status",
+]
+
+# Backwards-compatible alias used by older docs/tests
+TEMPLATE_HEADERS = INVENTORY_HEADERS
+
+STATUS_IN_INVENTORY = "In inventory"
+STATUS_NEW = "New"
 
 HEADER_ALIASES = {
     "sku": "SKU",
@@ -26,6 +47,10 @@ HEADER_ALIASES = {
     "serial number": "Details",
     "s/n": "Details",
     "description": "Details",
+    "category": "Category",
+    "catagory": "Category",  # common misspelling
+    "categories": "Category",
+    "type": "Category",
     "qty": "Qty",
     "quantity": "Qty",
     "stock": "Qty",
@@ -33,6 +58,8 @@ HEADER_ALIASES = {
     "price": "Price",
     "unit price": "Price",
     "cost": "Price",
+    "status": "Status",
+    "state": "Status",
 }
 
 
@@ -46,60 +73,6 @@ class ImportResult:
     @property
     def ok_count(self) -> int:
         return self.added + self.updated
-
-
-def template_path(base: Path | None = None) -> Path:
-    from config import ASSETS_DIR
-
-    root = base or ASSETS_DIR
-    return Path(root) / "product_import_template.xlsx"
-
-
-def write_excel_template(path: Path | str) -> Path:
-    """Write a blank Excel template with headings (and one example row)."""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font
-
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Products"
-    for col, header in enumerate(TEMPLATE_HEADERS, start=1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-    # Example row so the sheet is clear how to fill it
-    ws.append(["60000", "Dell Latitude Laptop", "i5 16GB 512GB", 2, 699.99])
-    ws.append(["60001", "Laptop Case", "15.6 inch", 10, 15.00])
-
-    widths = {"A": 14, "B": 32, "C": 36, "D": 10, "E": 12}
-    for letter, width in widths.items():
-        ws.column_dimensions[letter].width = width
-
-    wb.save(path)
-    return path
-
-
-def write_csv_template(path: Path | str) -> Path:
-    """CSV twin of the Excel template (handy for Google Sheets → Download → CSV)."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(TEMPLATE_HEADERS)
-        writer.writerow(["60000", "Dell Latitude Laptop", "i5 16GB 512GB", 2, 699.99])
-        writer.writerow(["60001", "Laptop Case", "15.6 inch", 10, 15.00])
-    return path
-
-
-def ensure_templates(assets_dir: Path | None = None) -> tuple[Path, Path]:
-    from config import ASSETS_DIR
-
-    root = Path(assets_dir) if assets_dir else ASSETS_DIR
-    xlsx = write_excel_template(root / "product_import_template.xlsx")
-    csv_path = write_csv_template(root / "product_import_template.csv")
-    return xlsx, csv_path
 
 
 def _normalize_header(raw: str) -> str | None:
@@ -139,6 +112,11 @@ def _parse_qty(raw: str) -> int:
     return int(float(clean))
 
 
+def _is_in_inventory_status(status: str) -> bool:
+    s = (status or "").strip().lower()
+    return s in ("in inventory", "imported", "exists", "synced", "in stock system")
+
+
 def _rows_from_xlsx(path: Path) -> tuple[list[str], list[list]]:
     from openpyxl import load_workbook
 
@@ -174,36 +152,181 @@ def read_product_rows(path: Path | str) -> list[dict]:
     elif suffix in (".csv", ".txt"):
         headers, data = _rows_from_csv(path)
     else:
-        raise ValueError("Use an Excel (.xlsx) or CSV file. Google Sheets: File → Download → Excel or CSV.")
+        raise ValueError(
+            "Use an Excel (.xlsx) or CSV file. Google Sheets: File → Download → Excel or CSV."
+        )
 
     mapping = _map_headers(headers)
+    if "SKU" not in mapping:
+        raise ValueError(
+            "Missing required column: SKU.\n"
+            f"Expected headings: {', '.join(INVENTORY_HEADERS)}"
+        )
     if "Product Name" not in mapping:
         raise ValueError(
             "Missing required column: Product Name.\n"
-            f"Expected headings: {', '.join(TEMPLATE_HEADERS)}"
+            f"Expected headings: {', '.join(INVENTORY_HEADERS)}"
         )
 
     products: list[dict] = []
     for row_num, row in enumerate(data, start=2):
         if not row or all(c is None or str(c).strip() == "" for c in row):
             continue
-        name = _cell(row, mapping.get("Product Name"))
-        if not name:
-            continue
         products.append({
             "row": row_num,
-            "name": name,
             "sku": _cell(row, mapping.get("SKU")),
+            "name": _cell(row, mapping.get("Product Name")),
             "serial_number": _cell(row, mapping.get("Details")),
+            "category": _cell(row, mapping.get("Category")),
             "qty": _cell(row, mapping.get("Qty")),
             "price": _cell(row, mapping.get("Price")),
+            "status": _cell(row, mapping.get("Status")),
         })
     return products
 
 
-def import_products_from_file(path: Path | str, *, update_existing_by_sku: bool = True) -> ImportResult:
-    """Import products into the database. Matches existing rows by SKU when present."""
-    from database import add_product, search_products, update_product
+def write_inventory_workbook(
+    path: Path | str,
+    products: list[Product] | None = None,
+    *,
+    blank_rows: int = 8,
+) -> Path:
+    """Write current inventory (Status=In inventory) plus blank rows for new items."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    products = list(products or [])
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inventory"
+
+    for col, header in enumerate(INVENTORY_HEADERS, start=1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+
+    status_fill = PatternFill("solid", fgColor="D1FAE5")
+    for i, p in enumerate(products, start=2):
+        values = [
+            p.sku or "",
+            p.name,
+            p.serial_number or "",
+            p.category or "Other",
+            p.qty,
+            p.price,
+            STATUS_IN_INVENTORY,
+        ]
+        for col, val in enumerate(values, start=1):
+            cell = ws.cell(row=i, column=col, value=val)
+            if col == 7:
+                cell.fill = status_fill
+
+    start_blank = len(products) + 2
+    for r in range(start_blank, start_blank + blank_rows):
+        ws.cell(row=r, column=7, value="")  # Status blank = new on import
+
+    # Category dropdown for convenience
+    cats = get_product_categories()
+    if cats:
+        try:
+            joined = ",".join(c.replace(",", " ") for c in cats)
+            if len(joined) < 250:
+                dv = DataValidation(
+                    type="list",
+                    formula1=f'"{joined}"',
+                    allow_blank=True,
+                    showDropDown=False,
+                )
+                dv.error = "Pick a category from the list or type a new one"
+                dv.errorTitle = "Category"
+                ws.add_data_validation(dv)
+                last_row = max(start_blank + blank_rows - 1, 2)
+                dv.add(f"D2:D{last_row}")
+        except Exception:
+            pass
+    widths = {"A": 14, "B": 32, "C": 36, "D": 16, "E": 10, "F": 12, "G": 14}
+    for letter, width in widths.items():
+        ws.column_dimensions[letter].width = width
+
+    # Notes sheet
+    notes = wb.create_sheet("How to use")
+    notes["A1"] = "How to keep inventory up to date"
+    notes["A1"].font = Font(bold=True)
+    notes["A3"] = "1. Rows marked Status = In inventory are already in Retail Invoice — Import skips them."
+    notes["A4"] = "2. Add new products on blank rows below. Always fill in SKU (required) and Product Name."
+    notes["A5"] = "3. Leave Status blank (or type New) for new rows."
+    notes["A6"] = "4. Save the file, then in Products click Import spreadsheet — only new SKUs are added."
+    notes["A7"] = f"5. Categories: {', '.join(cats)}"
+    notes.column_dimensions["A"].width = 100
+
+    wb.save(path)
+    return path
+
+
+def write_inventory_csv(path: Path | str, products: list[Product] | None = None, *, blank_rows: int = 8) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    products = list(products or [])
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(INVENTORY_HEADERS)
+        for p in products:
+            writer.writerow([
+                p.sku or "",
+                p.name,
+                p.serial_number or "",
+                p.category or "Other",
+                p.qty,
+                p.price,
+                STATUS_IN_INVENTORY,
+            ])
+        for _ in range(blank_rows):
+            writer.writerow(["", "", "", "", "", "", ""])
+    return path
+
+
+def write_excel_template(path: Path | str) -> Path:
+    """Empty inventory sheet (headings + blank rows) for first-time use."""
+    return write_inventory_workbook(path, products=[], blank_rows=12)
+
+
+def write_csv_template(path: Path | str) -> Path:
+    return write_inventory_csv(path, products=[], blank_rows=12)
+
+
+def ensure_templates(assets_dir: Path | None = None) -> tuple[Path, Path]:
+    from config import ASSETS_DIR
+
+    root = Path(assets_dir) if assets_dir else ASSETS_DIR
+    xlsx = write_excel_template(root / "product_import_template.xlsx")
+    csv_path = write_csv_template(root / "product_import_template.csv")
+    return xlsx, csv_path
+
+
+def export_inventory(path: Path | str) -> Path:
+    """Download current inventory with Status column filled."""
+    from database import search_products
+
+    products = search_products("")
+    path = Path(path)
+    if path.suffix.lower() == ".csv":
+        return write_inventory_csv(path, products)
+    if path.suffix.lower() != ".xlsx":
+        path = path.with_suffix(".xlsx")
+    return write_inventory_workbook(path, products)
+
+
+def import_products_from_file(path: Path | str, *, new_only: bool = True) -> ImportResult:
+    """Import products. Only adds rows with a SKU that are not already in inventory.
+
+    - Rows without SKU are skipped
+    - Rows with Status = In inventory are skipped
+    - Existing SKUs are skipped (never updated when new_only=True)
+    """
+    from database import add_product, search_products
 
     result = ImportResult()
     try:
@@ -213,13 +336,41 @@ def import_products_from_file(path: Path | str, *, update_existing_by_sku: bool 
         return result
 
     if not rows:
-        result.errors.append("No product rows found. Fill in the template and try again.")
+        result.errors.append("No product rows found. Download inventory, add new rows, then try again.")
         return result
 
+    # Cache existing SKUs (case-insensitive)
+    existing_skus = {
+        (p.sku or "").strip().lower()
+        for p in search_products("")
+        if (p.sku or "").strip()
+    }
+    categories = get_product_categories()
+
     for row in rows:
+        sku = (row.get("sku") or "").strip()
+        if not sku:
+            result.skipped += 1
+            continue
+
+        if _is_in_inventory_status(row.get("status") or ""):
+            result.skipped += 1
+            continue
+
+        sku_key = sku.lower()
+        if sku_key in existing_skus:
+            result.skipped += 1
+            continue
+
+        name = (row.get("name") or "").strip()
+        if not name:
+            result.skipped += 1
+            result.errors.append(f"Row {row['row']}: Product Name is required for new items")
+            continue
+
         try:
-            price = _parse_price(row["price"])
-            qty = _parse_qty(row["qty"])
+            price = _parse_price(row.get("price") or "")
+            qty = _parse_qty(row.get("qty") or "")
             if qty < 0:
                 raise ValueError("Qty cannot be negative")
             if price < 0:
@@ -229,29 +380,23 @@ def import_products_from_file(path: Path | str, *, update_existing_by_sku: bool 
             result.errors.append(f"Row {row['row']}: {e}")
             continue
 
+        category = normalize_category(row.get("category") or "", categories)
         product = Product(
             id=None,
-            name=row["name"],
-            serial_number=row["serial_number"],
-            sku=row["sku"],
+            name=name,
+            serial_number=(row.get("serial_number") or "").strip(),
+            sku=sku,
             price=price,
             qty=qty,
-            category="",
+            category=category,
             created_at="",
         )
+        add_product(product)
+        existing_skus.add(sku_key)
+        result.added += 1
 
-        existing = None
-        if update_existing_by_sku and product.sku:
-            matches = [p for p in search_products(product.sku) if (p.sku or "").strip().lower() == product.sku.lower()]
-            if matches:
-                existing = matches[0]
-
-        if existing:
-            product.id = existing.id
-            update_product(product)
-            result.updated += 1
-        else:
-            add_product(product)
-            result.added += 1
-
+    if not result.ok_count and not result.errors:
+        result.errors.append(
+            "No new products to add. Fill SKU on blank rows (Status empty or New), then import again."
+        )
     return result

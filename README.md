@@ -14,7 +14,7 @@ Built so an 85-year-old can complete a sale, and a busy business owner can run t
 
 That’s it. A welcome wizard may appear; you can fill it in or click **Skip for now** and start selling immediately.
 
-Current release: **1.6.0**
+Current release: **1.6.0** (1.7.0-beta: categories + inventory sync)
 
 ---
 
@@ -36,22 +36,22 @@ Nothing has to be completed before you can sell. Defaults work out of the box (1
 - **Quantity picker** — Choose how many when adding from inventory; adjust with +/− on each line
 - **Preview Receipt** — See the receipt before you print
 - **Beautiful thermal receipts** — Clear layout for Epson TM-T20 and similar printers
-- **Products** — Add/edit stock; **batch import** from Excel or Google Sheets (CSV); low-stock warnings
-- **Sales History** — Today / This week / Monthly / Quarterly / Yearly; view, reprint, email
-- **Setup** — Store details, tax as a percentage, default discount timing, printer test, email receipts, backup your data
+- **Products** — Add/edit stock; categories; **Download inventory** / Import spreadsheet (new SKUs only); low-stock warnings
+- **Reports** — Sales history (Today / week / month / quarter / year), reprint, email, **print inventory list**
+- **Setup** — Store details, tax, discount timing, **product categories**, printer test, email receipts, backup
 - **Keyboard shortcuts** — F1–F4 tabs, F5/F6 product save, F10 save, F11 preview, F12 complete + print, then F7/F8 pay and F12 confirm
 
 ---
 
-## Batch import products
+## Batch import / keep inventory up to date
 
-1. Open the **Products** tab
-2. Click **Download template** (Excel or CSV)
-3. Fill in rows: **SKU**, **Product Name**, **Details**, **Qty**, **Price**
-4. For Google Sheets: paste into a sheet, or upload the CSV / Excel file
-5. Click **Import spreadsheet** and choose your file
+1. Open **Products** → **Download inventory** (Excel or CSV)
+2. Existing items show **Status = In inventory**
+3. Add new products on blank rows — always fill **SKU** (and name, category, qty, price)
+4. Leave Status blank (or `New`) for new rows
+5. **Import spreadsheet** — only new SKUs are added; existing rows are skipped
 
-Rows with a matching SKU update that product; new SKUs are added.
+For Google Sheets: open the CSV, edit, File → Download → Excel/CSV, then Import.
 ---
 
 ## How to make a sale
