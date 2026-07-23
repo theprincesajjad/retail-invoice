@@ -5,91 +5,60 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Release version (e.g. 1.5.0)"
-        required: true
-        default: "1.5.0"
-      prerelease:
-        description: "Mark as prerelease"
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    runs-on: windows-latest
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: windows-latest
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
+          node-version: 22
+          cache: npm
 
-      - name: Resolve version
-        id: version
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-            PRERELEASE="${{ github.event.inputs.prerelease }}"
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
-            if [[ "$VERSION" == *beta* || "$VERSION" == *rc* || "$VERSION" == *alpha* ]]; then
-              PRERELEASE=true
-            else
-              PRERELEASE=false
-            fi
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
-          echo "Building version $VERSION (prerelease=$PRERELEASE)"
-
-      - name: Sync VERSION file
-        shell: bash
-        run: echo "${{ steps.version.outputs.version }}" > VERSION
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build single-file executable
-        run: >
-          pyinstaller --name "RetailInvoice" --onefile --windowed --noconfirm --clean
-          --add-data "assets;assets"
-          --add-data "VERSION;."
-          --add-data "CHANGELOG.md;."
-          --collect-all customtkinter
-          --hidden-import customtkinter
-          --hidden-import pywin32
-          --hidden-import PIL
-          --hidden-import escpos
-          --hidden-import win32print
-          --hidden-import win32api
-          --hidden-import reportlab
-          --hidden-import reportlab.pdfgen.canvas
-          --hidden-import openpyxl
-          main.py
-
-      - name: Rename release binary
-        shell: bash
-        run: |
-          cp dist/RetailInvoice.exe "dist/RetailInvoice-${{ steps.version.outputs.version }}-Windows.exe"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Retail Invoice ${{ steps.version.outputs.version }}
-          body_path: RELEASE_NOTES.md
-          files: dist/RetailInvoice-${{ steps.version.outputs.version }}-Windows.exe
-          draft: false
-          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
-          generate_release_notes: false
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Retail Invoice ${{ github.ref_name }}"
+          releaseBody: "Local-first invoicing and inventory for Windows and Mac. Your data stays on this computer."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  legacy-python-windows:
+    if: false
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Legacy Python build retained under legacy/"
