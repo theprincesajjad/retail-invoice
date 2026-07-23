@@ -1,112 +1,77 @@
 # Retail Invoice
 
-A simple, beautiful retail invoicing app for Windows shops — ring up sales, print receipts, track inventory, and see today’s numbers.
+Local-first invoicing and inventory for small businesses. One app for **Windows and Mac**. Your data stays on this computer — nothing is uploaded to the cloud.
 
-Built so an 85-year-old can complete a sale, and a busy business owner can run the store without fuss.
+Built so anyone can complete a sale quickly, with a clean interface and optional keyboard shortcuts for power users.
 
 ---
 
-## Download (easiest)
+## Download
 
 1. Open **[Releases](https://github.com/theprincesajjad/retail-invoice/releases)**
-2. Download the latest **Windows.exe**
-3. Double-click — no install, no Python, no setup required
+2. Download the installer for your system (Windows `.msi` / `.exe` or macOS `.dmg`)
+3. Open the app — no account, no internet required
 
-That’s it. A welcome wizard may appear; you can fill it in or click **Skip for now** and start selling immediately.
-
-Current release: **1.6.0**
+Current version: **2.0.0**
 
 ---
 
-## First launch
+## Privacy
 
-| Step | What happens |
-|------|----------------|
-| Welcome wizard | Optional. Store name, address, phone, tax %. Skip anytime. |
-| New Sale | Add products, take payment, press the green **Complete Sale & Print Receipt** button. |
-| Setup (later) | Pick your receipt printer, logo, email — only when you need them. |
-
-Nothing has to be completed before you can sell. Defaults work out of the box (13% tax, sample store details you can change anytime).
+- Sales, products, and settings live in a **local SQLite database** on your machine
+- Optional email receipts only leave the computer when you press Email
+- Backup and restore are plain files you control
 
 ---
 
 ## Features
 
-- **New Sale** — Customer info, product search, custom lines, discounts (% or $, before or after tax), Cash/Card/Other
-- **Quantity picker** — Choose how many when adding from inventory; adjust with +/− on each line
-- **Preview Receipt** — See the receipt before you print
-- **Beautiful thermal receipts** — Clear layout for Epson TM-T20 and similar printers
-- **Products** — Add/edit stock; **batch import** from Excel or Google Sheets (CSV); low-stock warnings
-- **Sales History** — Today / This week / Monthly / Quarterly / Yearly; view, reprint, email
-- **Setup** — Store details, tax as a percentage, default discount timing, printer test, email receipts, backup your data
-- **Keyboard shortcuts** — F1–F4 tabs, F5/F6 product save, F10 save, F11 preview, F12 complete + print, then F7/F8 pay and F12 confirm
+- **Sale** — customer info, product search, custom lines, discounts, Cash / Card / Other
+- **Products** — add and edit stock; import CSV or Excel; low-stock hints
+- **History** — filter by period, reprint PDF, email receipts
+- **Setup** — store details, tax rate, light / dark / system appearance, receipt toggles, SMTP, backup, import from the older Python app database
+- **Shortcuts** — F1–F4 tabs, F10 save PDF, F11 preview, F12 complete + print
 
 ---
 
-## Batch import products
-
-1. Open the **Products** tab
-2. Click **Download template** (Excel or CSV)
-3. Fill in rows: **SKU**, **Product Name**, **Details**, **Qty**, **Price**
-4. For Google Sheets: paste into a sheet, or upload the CSV / Excel file
-5. Click **Import spreadsheet** and choose your file
-
-Rows with a matching SKU update that product; new SKUs are added.
----
-
-## How to make a sale
-
-1. Open the **New Sale** tab  
-2. (Optional) Enter customer name / phone  
-3. Search for a product → **Add to sale** → choose quantity  
-4. Choose how they paid (Cash / Card / Other)  
-5. Press **Complete Sale & Print Receipt**  
-6. Confirm the total — done  
-
-Use **Preview Receipt** anytime before saving. Use **Save Without Printing** if you don’t need a paper copy.
-
----
-
-## Requirements
-
-- **Windows 10 or 11** for the `.exe`
-- Receipt printer optional (configure in **Setup** when ready)
-- Email receipts optional (Gmail app password in **Setup**)
-
----
-
-## Run from source (developers)
+## Run from source
 
 ```bash
 git clone https://github.com/theprincesajjad/retail-invoice.git
 cd retail-invoice
-pip install -r requirements.txt
-python main.py
+npm install
+npm run dev          # web UI (local DB in the browser)
+npm run tauri:dev    # desktop shell (needs Rust + platform deps)
 ```
 
-### Build the Windows `.exe` yourself
-
-On a Windows machine:
-
-```bat
-build.bat
-```
-
-Or let GitHub Actions build it — push a version tag:
+### Build desktop installers
 
 ```bash
-# Update VERSION and CHANGELOG.md, commit, then:
-git tag v1.6.0
-git push origin v1.6.0
+npm run tauri:build
 ```
 
-That triggers [.github/workflows/release.yml](.github/workflows/release.yml), which builds `RetailInvoice-x.x.x-Windows.exe` and publishes a GitHub Release.
+Artifacts appear under `src-tauri/target/release/bundle/`.
 
 ---
 
-## Changelog
+## Migrating from the Python app (v1)
 
-See [CHANGELOG.md](CHANGELOG.md) for what’s new in each version.
+1. Open **Setup → Import previous Retail Invoice database**
+2. Choose your old `data/invoices.db`
+3. Products, settings, and past invoices are copied in
+
+The previous CustomTkinter app is preserved under [`legacy/`](legacy/) for reference.
+
+---
+
+## Develop
+
+```bash
+npm test             # unit tests
+npm run build        # production web build
+```
+
+Design tokens follow [`.agents/skills/redesign-existing-projects/SKILL.md`](.agents/skills/redesign-existing-projects/SKILL.md) (Geist / Manrope, light default, skill dark palette).
 
 ---
 
