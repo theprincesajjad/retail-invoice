@@ -100,7 +100,7 @@ export default function App() {
           className="border-t px-4 py-6 text-center text-xs text-[var(--text-tertiary)]"
           style={{ borderColor: "var(--border)" }}
         >
-          Retail Invoice · local only · v2.0.0
+          Retail Invoice · local only · v2.0.1
         </footer>
         {showWizard ? (
           <SetupWizard

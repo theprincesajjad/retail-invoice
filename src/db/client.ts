@@ -1,4 +1,5 @@
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
+import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { initSchema, type SqlJsDatabase } from "./queries";
 
 const IDB_NAME = "retail-invoice";
@@ -85,11 +86,28 @@ async function saveBytesToTauri(bytes: Uint8Array): Promise<void> {
   await writeFile(path, bytes);
 }
 
+function isWasmMagic(buffer: ArrayBuffer): boolean {
+  if (buffer.byteLength < 4) return false;
+  const header = new Uint8Array(buffer, 0, 4);
+  // \0asm
+  return header[0] === 0x00 && header[1] === 0x61 && header[2] === 0x73 && header[3] === 0x6d;
+}
+
 async function loadSqlWasm(): Promise<SqlJsStatic> {
   if (SQL) return SQL;
-  SQL = await initSqlJs({
-    locateFile: (file) => `${import.meta.env.BASE_URL}${file}`,
-  });
+
+  const response = await fetch(sqlWasmUrl);
+  if (!response.ok) {
+    throw new Error(`Could not load the local database engine (${response.status})`);
+  }
+  const wasmBinary = await response.arrayBuffer();
+  if (!isWasmMagic(wasmBinary)) {
+    throw new Error(
+      "Could not load the local database engine. Reinstall the app, or run npm run tauri:dev from source.",
+    );
+  }
+
+  SQL = await initSqlJs({ wasmBinary });
   return SQL;
 }
 

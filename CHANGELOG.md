@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1] — 2026-07-23
+
+### Fix
+
+- Packaged app failed to start on Windows/Mac with a WebAssembly magic-word error. The SQLite engine (`.wasm`) is now bundled as a Vite asset with relative URLs so Tauri loads the binary instead of `index.html`.
+
 ## [2.0.0] — 2026-07-23
 
 ### Rewrite

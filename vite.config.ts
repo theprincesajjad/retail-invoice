@@ -7,6 +7,8 @@ const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Relative asset URLs so Tauri's custom protocol can load JS/CSS/WASM
+  base: "./",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
