@@ -3,6 +3,7 @@ import { IslandNav } from "./components/IslandNav";
 import { ToastProvider } from "./components/Toast";
 import { getAllSettings } from "./db/queries";
 import { openDatabase, getDatabase } from "./db/client";
+import { isMac } from "./lib/platform";
 import type { AppTab, ThemePreference } from "./lib/types";
 import { HistoryPage } from "./pages/HistoryPage";
 import { ProductsPage } from "./pages/ProductsPage";
@@ -45,16 +46,18 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F1") {
+      const meta = e.metaKey || e.ctrlKey;
+      // Never animate keyboard nav — instant tab switch
+      if (e.key === "F1" || (meta && e.key === "1")) {
         e.preventDefault();
         setTab("sale");
-      } else if (e.key === "F2") {
+      } else if (e.key === "F2" || (meta && e.key === "2")) {
         e.preventDefault();
         setTab("products");
-      } else if (e.key === "F3") {
+      } else if (e.key === "F3" || (meta && e.key === "3")) {
         e.preventDefault();
         setTab("history");
-      } else if (e.key === "F4") {
+      } else if (e.key === "F4" || (meta && e.key === "4")) {
         e.preventDefault();
         setTab("setup");
       }
@@ -91,9 +94,13 @@ export default function App() {
         <div className="grain" aria-hidden />
         <div className="flex h-dvh flex-col overflow-hidden">
           <IslandNav active={tab} onChange={setTab} businessName={businessName} />
-          <main id="main" className="min-h-0 flex-1 overflow-hidden px-4 py-3">
+          <main id="main" className="min-h-0 flex-1 overflow-hidden px-3 py-2 sm:px-4 sm:py-3">
             <div className="h-full overflow-y-auto">
-              {tab === "sale" ? <div className="h-full overflow-hidden"><SalePage /></div> : null}
+              {tab === "sale" ? (
+                <div className="h-full overflow-hidden">
+                  <SalePage />
+                </div>
+              ) : null}
               {tab === "products" ? <ProductsPage /> : null}
               {tab === "history" ? <HistoryPage /> : null}
               {tab === "setup" ? <SetupPage onSaved={refreshBrand} /> : null}
@@ -108,6 +115,7 @@ export default function App() {
             }}
           />
         ) : null}
+        <span className="sr-only">{isMac() ? "Mac shortcuts active" : "Windows shortcuts active"}</span>
       </ToastProvider>
     </ThemeProvider>
   );

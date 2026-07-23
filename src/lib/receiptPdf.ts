@@ -7,7 +7,7 @@ function show(settings: AppSettings, key: keyof AppSettings): boolean {
 }
 
 export function buildReceiptPdf(invoice: Invoice, settings: AppSettings): jsPDF {
-  const doc = new jsPDF({ unit: "mm", format: [80, 200] });
+  const doc = new jsPDF({ unit: "mm", format: [80, 220] });
   let y = 8;
   const left = 4;
   const width = 72;
@@ -22,6 +22,16 @@ export function buildReceiptPdf(invoice: Invoice, settings: AppSettings): jsPDF 
     }
     y += size * 0.45 + 2;
   };
+
+  if (show(settings, "receipt_show_logo") && settings.logo_data) {
+    try {
+      const format = settings.logo_data.includes("image/png") ? "PNG" : "JPEG";
+      doc.addImage(settings.logo_data, format, 28, y, 24, 24);
+      y += 28;
+    } catch {
+      // Ignore bad logo data and continue with text header
+    }
+  }
 
   if (show(settings, "receipt_show_business_name")) {
     line(settings.business_name || "My Business", { bold: true, size: 12, center: true });
@@ -102,16 +112,61 @@ export function downloadReceiptPdf(invoice: Invoice, settings: AppSettings): voi
   doc.save(`${invoice.invoice_number}.pdf`);
 }
 
+/** Opens the system print dialog via a hidden iframe (more reliable than window.open). */
 export function openReceiptPrintDialog(invoice: Invoice, settings: AppSettings): void {
   const doc = buildReceiptPdf(invoice, settings);
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
-  const win = window.open(url, "_blank");
-  if (win) {
-    win.addEventListener("load", () => {
-      win.focus();
-      win.print();
-    });
-  }
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("title", "Print receipt");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } finally {
+      window.setTimeout(() => {
+        iframe.remove();
+        URL.revokeObjectURL(url);
+      }, 60_000);
+    }
+  };
+  iframe.src = url;
+}
+
+export function sampleTestInvoice(): Invoice {
+  return {
+    id: null,
+    invoice_number: "TEST-PRINT",
+    customer_name: "Test print",
+    customer_phone: "",
+    customer_email: "",
+    subtotal: 10,
+    tax_rate: 0.13,
+    tax_amount: 1.3,
+    total: 11.3,
+    payment_method: "Cash",
+    notes: "Printer connection test",
+    created_at: new Date().toLocaleString(),
+    items: [
+      {
+        product_id: null,
+        description: "Test item",
+        serial_number: "",
+        qty: 1,
+        unit_price: 10,
+        line_total: 10,
+      },
+    ],
+    discount_type: "",
+    discount_value: 0,
+    discount_amount: 0,
+    discount_timing: "before_tax",
+  };
 }

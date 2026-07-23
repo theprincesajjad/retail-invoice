@@ -27,8 +27,12 @@ export function Dialog({
         onClick={onClose}
       />
       <div
-        className="relative z-10 w-full max-w-md rounded-xl border p-6 shadow-[var(--shadow)] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]"
-        style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        className="relative z-10 w-full max-w-md rounded-xl border p-6 shadow-[var(--shadow)]"
+        style={{
+          background: "var(--surface)",
+          borderColor: "var(--border)",
+          animation: "dialogIn 200ms cubic-bezier(0.23, 1, 0.32, 1)",
+        }}
       >
         <h2 className="text-xl font-semibold tracking-tight text-[var(--text)] text-wrap-balance">
           {title}
@@ -82,10 +86,10 @@ export function Button({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`focus-ring inline-flex items-center justify-center rounded-lg border px-3 py-2 text-base font-semibold transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] hover:opacity-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`focus-ring inline-flex items-center justify-center rounded-lg border px-3 py-2 text-base font-semibold transition-[transform,opacity,background-color,color] duration-160 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={styles[variant]}
       onMouseEnter={(e) => {
-        if (variant === "primary") {
+        if (variant === "primary" && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
           (e.currentTarget as HTMLButtonElement).style.background = "var(--accent-hover)";
         }
       }}

@@ -42,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <button
             key={t.id}
             type="button"
-            className="pointer-events-auto rounded-lg border px-4 py-3 text-left text-sm shadow-[var(--shadow)] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]"
+            className="pointer-events-auto rounded-lg border px-4 py-3 text-left text-sm shadow-[var(--shadow)] transition-[transform,opacity] duration-[400ms] ease-[ease]"
             style={{
               background: "var(--surface-raised)",
               borderColor:
@@ -52,6 +52,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                     ? "var(--accent)"
                     : "var(--border)",
               color: "var(--text)",
+              animation: "statusIn 180ms cubic-bezier(0.23, 1, 0.32, 1)",
             }}
             onClick={() => setItems((prev) => prev.filter((x) => x.id !== t.id))}
           >

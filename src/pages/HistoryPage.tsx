@@ -3,8 +3,9 @@ import { getAllSettings, searchInvoices } from "../db/queries";
 import { getDatabase } from "../db/client";
 import { formatCurrency } from "../lib/money";
 import { downloadReceiptPdf, openReceiptPrintDialog } from "../lib/receiptPdf";
-import type { Invoice } from "../lib/types";
+import type { AppSettings, Invoice } from "../lib/types";
 import { EmptyState, SkeletonRows } from "../components/EmptyState";
+import { ReceiptViewer } from "../components/ReceiptViewer";
 import { useToast } from "../components/Toast";
 import { Button, Field, inputClass, inputStyle } from "../components/ui";
 import { invoke } from "@tauri-apps/api/core";
@@ -35,11 +36,14 @@ export function HistoryPage() {
   const [period, setPeriod] = useState<Period>("today");
   const [query, setQuery] = useState("");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [viewing, setViewing] = useState<Invoice | null>(null);
+  const [settings, setSettings] = useState<AppSettings>(getAllSettings(getDatabase()));
 
   function refresh() {
     const db = getDatabase();
     const { start, end } = rangeFor(period);
     setInvoices(searchInvoices(db, query, start, end));
+    setSettings(getAllSettings(db));
     setLoading(false);
   }
 
@@ -56,24 +60,24 @@ export function HistoryPage() {
   }, [invoices]);
 
   async function emailInvoice(invoice: Invoice) {
-    const settings = getAllSettings(getDatabase());
+    const current = getAllSettings(getDatabase());
     if (!invoice.customer_email) {
       toast.push("This sale has no customer email", "error");
       return;
     }
-    if (!settings.smtp_email || !settings.smtp_password) {
+    if (!current.smtp_email || !current.smtp_password) {
       toast.push("Add SMTP details in Setup before emailing", "error");
       return;
     }
     try {
       await invoke("send_invoice_email", {
-        host: settings.smtp_host,
-        port: Number(settings.smtp_port) || 587,
-        username: settings.smtp_email,
-        password: settings.smtp_password,
-        fromName: settings.smtp_from_name || settings.business_name,
+        host: current.smtp_host,
+        port: Number(current.smtp_port) || 587,
+        username: current.smtp_email,
+        password: current.smtp_password,
+        fromName: current.smtp_from_name || current.business_name,
         toEmail: invoice.customer_email,
-        subject: `Receipt ${invoice.invoice_number} from ${settings.business_name}`,
+        subject: `Receipt ${invoice.invoice_number} from ${current.business_name}`,
         body: `Thank you for your purchase.\n\nInvoice: ${invoice.invoice_number}\nTotal: ${formatCurrency(invoice.total)}\n\nAll data for this business stays on the shop computer.`,
       });
       toast.push("Email sent", "success");
@@ -91,7 +95,7 @@ export function HistoryPage() {
         <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight">Sales history</h2>
           <p className="text-sm text-[var(--text-secondary)]">
-            Reprint or email receipts from this computer
+            View, print, or email receipts from this computer
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -149,13 +153,17 @@ export function HistoryPage() {
         ) : !invoices.length ? (
           <EmptyState
             title="No sales in this period"
-            body="Completed sales will show up here with reprint and email actions."
+            body="Completed sales will show up here with view, print, and email actions."
           />
         ) : (
           <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
             {invoices.map((inv) => (
-              <li key={inv.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-                <div className="min-w-0">
+              <li key={inv.id} className="flex flex-wrap items-center justify-between gap-4 py-3">
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left transition-opacity duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-80 active:scale-[0.99]"
+                  onClick={() => setViewing(inv)}
+                >
                   <p className="font-semibold tracking-tight">
                     {inv.invoice_number}{" "}
                     <span className="tabular font-medium text-[var(--text-secondary)]">
@@ -167,16 +175,16 @@ export function HistoryPage() {
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
-                </div>
+                </button>
                 <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => setViewing(inv)}>View</Button>
                   <Button
+                    variant="primary"
                     onClick={() => openReceiptPrintDialog(inv, getAllSettings(getDatabase()))}
                   >
                     Print
                   </Button>
-                  <Button
-                    onClick={() => downloadReceiptPdf(inv, getAllSettings(getDatabase()))}
-                  >
+                  <Button onClick={() => downloadReceiptPdf(inv, getAllSettings(getDatabase()))}>
                     PDF
                   </Button>
                   <Button variant="ghost" onClick={() => void emailInvoice(inv)}>
@@ -188,6 +196,13 @@ export function HistoryPage() {
           </ul>
         )}
       </div>
+
+      <ReceiptViewer
+        open={viewing !== null}
+        invoice={viewing}
+        settings={settings}
+        onClose={() => setViewing(null)}
+      />
     </div>
   );
 }

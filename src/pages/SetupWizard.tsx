@@ -2,6 +2,8 @@ import { useState } from "react";
 import { getAllSettings, saveSettings } from "../db/queries";
 import { getDatabase, schedulePersist } from "../db/client";
 import { Button, Field, inputClass, inputStyle } from "../components/ui";
+import { ShortcutsPanel } from "../components/ShortcutsPanel";
+import { isMac } from "../lib/platform";
 
 export function SetupWizard({ onDone }: { onDone: () => void }) {
   const existing = getAllSettings(getDatabase());
@@ -14,6 +16,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     existing.business_phone.includes("555-0123") ? "" : existing.business_phone,
   );
   const [taxRate, setTaxRate] = useState(existing.tax_rate || "0.13");
+  const mac = isMac();
 
   function finish(skip: boolean) {
     const db = getDatabase();
@@ -46,8 +49,14 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
       body: "Enter your local rate as a decimal. Example: 0.13 for 13%.",
     },
     {
+      title: mac ? "Mac shortcuts" : "Windows shortcuts",
+      body: mac
+        ? "Mac keyboards use Command for speed. Function keys often control the display, so we map sales actions to ⌘ shortcuts."
+        : "Use the F keys to move fast at the counter. You can revisit this list anytime in Setup.",
+    },
+    {
       title: "You are ready",
-      body: "Start with Sale. Add products when you have a moment. Setup can wait.",
+      body: "Start on Sale. Add products when you have a moment. Shortcuts live in Setup if you need a refresher.",
     },
   ];
 
@@ -57,7 +66,11 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--scrim)" }}>
       <div
         className="w-full max-w-lg rounded-xl border p-8 shadow-[var(--shadow)]"
-        style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        style={{
+          background: "var(--surface)",
+          borderColor: "var(--border)",
+          animation: "dialogIn 220ms cubic-bezier(0.23, 1, 0.32, 1)",
+        }}
       >
         <p className="text-xs font-medium tracking-[0.14em] text-[var(--text-tertiary)] uppercase">
           Step {step + 1} of {steps.length}
@@ -110,6 +123,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
           </div>
         ) : null}
 
+        {step === 3 ? (
+          <div className="mt-6 max-h-[40dvh] overflow-y-auto">
+            <ShortcutsPanel compact />
+          </div>
+        ) : null}
+
         <div className="mt-8 flex flex-wrap gap-2">
           {step < steps.length - 1 ? (
             <Button variant="primary" onClick={() => setStep((s) => s + 1)}>
@@ -120,6 +139,11 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               Start selling
             </Button>
           )}
+          {step > 0 ? (
+            <Button variant="ghost" onClick={() => setStep((s) => s - 1)}>
+              Back
+            </Button>
+          ) : null}
           <Button variant="ghost" onClick={() => finish(true)}>
             Skip for now
           </Button>

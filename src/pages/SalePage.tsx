@@ -19,6 +19,8 @@ import type {
 import { useToast } from "../components/Toast";
 import { Button, Dialog, Field, inputClass, inputStyle } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
+import { useViewportDensity } from "../lib/viewport";
+import { shortcutLabel } from "../lib/platform";
 
 interface LineDraft extends InvoiceItem {
   key: string;
@@ -26,6 +28,7 @@ interface LineDraft extends InvoiceItem {
 
 export function SalePage() {
   const toast = useToast();
+  const { compact, ultraCompact, narrow } = useViewportDensity();
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -207,18 +210,25 @@ export function SalePage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F10") {
+      const meta = e.metaKey || e.ctrlKey;
+      const savePdf = e.key === "F10" || (meta && e.key.toLowerCase() === "s");
+      const preview = e.key === "F11" || (meta && e.key.toLowerCase() === "p");
+      const complete = e.key === "F12" || (meta && e.key === "Enter");
+      const cash = e.key === "F7" || (meta && e.key === "7");
+      const card = e.key === "F8" || (meta && e.key === "8");
+
+      if (savePdf) {
         e.preventDefault();
         if (!lines.length) return;
         setPayment("Cash");
         finalize(false);
       }
-      if (e.key === "F11") {
+      if (preview) {
         e.preventDefault();
         if (!lines.length) return;
         const db = getDatabase();
         const settings = getAllSettings(db);
-        const preview: Invoice = {
+        const previewInv: Invoice = {
           id: null,
           invoice_number: "PREVIEW",
           customer_name: customerName,
@@ -237,9 +247,9 @@ export function SalePage() {
           discount_amount: totals.discount_amount,
           discount_timing: discountTiming,
         };
-        openReceiptPrintDialog(preview, settings);
+        openReceiptPrintDialog(previewInv, settings);
       }
-      if (e.key === "F12") {
+      if (complete) {
         e.preventDefault();
         if (confirmOpen) {
           finalize(true);
@@ -248,11 +258,11 @@ export function SalePage() {
         if (paymentOpen) return;
         beginComplete();
       }
-      if (paymentOpen && e.key === "F7") {
+      if (paymentOpen && cash) {
         e.preventDefault();
         confirmPayment("Cash");
       }
-      if (paymentOpen && e.key === "F8") {
+      if (paymentOpen && card) {
         e.preventDefault();
         confirmPayment("Card");
       }
@@ -263,9 +273,15 @@ export function SalePage() {
   }, [lines, paymentOpen, confirmOpen, totals, customerName, customerPhone, customerEmail, notes, payment, discountType, discountValue, discountTiming, taxRate]);
 
   return (
-    <div className="mx-auto grid h-full max-w-[1440px] gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:grid-rows-1">
-      <section className="flex min-h-0 min-w-0 flex-col gap-3">
-        <div className="grid shrink-0 gap-2 sm:grid-cols-3">
+    <div
+      className={`mx-auto grid h-full max-w-[1440px] ${narrow || compact ? "gap-2" : "gap-4"} ${
+        narrow
+          ? "grid-cols-1 grid-rows-[minmax(0,1fr)_auto]"
+          : "lg:grid-cols-[minmax(0,1fr)_minmax(240px,280px)] lg:grid-rows-1"
+      }`}
+    >
+      <section className={`flex min-h-0 min-w-0 flex-col ${compact ? "gap-2" : "gap-3"}`}>
+        <div className={`grid shrink-0 ${compact ? "gap-1.5" : "gap-2"} sm:grid-cols-3`}>
           <Field label="Name">
             <input
               className={inputClass}
@@ -295,7 +311,7 @@ export function SalePage() {
           </Field>
         </div>
 
-        <div className="grid shrink-0 gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]">
+        <div className={`grid shrink-0 ${compact ? "gap-1.5" : "gap-2"} sm:grid-cols-[120px_minmax(0,1fr)_auto]`}>
           <Field label="Search">
             <input
               className={inputClass}
@@ -337,46 +353,48 @@ export function SalePage() {
           </div>
         </div>
 
-        <div className="grid shrink-0 gap-2 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_72px_100px_auto]">
-          <Field label="Custom item">
-            <input
-              className={inputClass}
-              style={inputStyle()}
-              value={manualDesc}
-              onChange={(e) => setManualDesc(e.target.value)}
-              placeholder="Description"
-            />
-          </Field>
-          <Field label="Details">
-            <input
-              className={inputClass}
-              style={inputStyle()}
-              value={manualDetails}
-              onChange={(e) => setManualDetails(e.target.value)}
-              placeholder="Optional"
-            />
-          </Field>
-          <Field label="Qty">
-            <input
-              className={`${inputClass} tabular`}
-              style={inputStyle()}
-              value={manualQty}
-              onChange={(e) => setManualQty(e.target.value)}
-            />
-          </Field>
-          <Field label="Price">
-            <input
-              className={`${inputClass} tabular`}
-              style={inputStyle()}
-              value={manualPrice}
-              onChange={(e) => setManualPrice(e.target.value)}
-              placeholder="0.00"
-            />
-          </Field>
-          <div className="flex items-end">
-            <Button onClick={addManual}>Add</Button>
+        {!ultraCompact ? (
+          <div className={`grid shrink-0 ${compact ? "gap-1.5" : "gap-2"} sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_72px_100px_auto]`}>
+            <Field label="Custom item">
+              <input
+                className={inputClass}
+                style={inputStyle()}
+                value={manualDesc}
+                onChange={(e) => setManualDesc(e.target.value)}
+                placeholder="Description"
+              />
+            </Field>
+            <Field label="Details">
+              <input
+                className={inputClass}
+                style={inputStyle()}
+                value={manualDetails}
+                onChange={(e) => setManualDetails(e.target.value)}
+                placeholder="Optional"
+              />
+            </Field>
+            <Field label="Qty">
+              <input
+                className={`${inputClass} tabular`}
+                style={inputStyle()}
+                value={manualQty}
+                onChange={(e) => setManualQty(e.target.value)}
+              />
+            </Field>
+            <Field label="Price">
+              <input
+                className={`${inputClass} tabular`}
+                style={inputStyle()}
+                value={manualPrice}
+                onChange={(e) => setManualPrice(e.target.value)}
+                placeholder="0.00"
+              />
+            </Field>
+            <div className="flex items-end">
+              <Button onClick={addManual}>Add</Button>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col">
           <div
@@ -414,7 +432,7 @@ export function SalePage() {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        className="focus-ring h-8 w-8 rounded-md border text-sm"
+                        className="focus-ring h-8 w-8 rounded-md border text-sm transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
                         style={{ borderColor: "var(--border)" }}
                         onClick={() => updateQty(line.key, line.qty - 1)}
                       >
@@ -423,7 +441,7 @@ export function SalePage() {
                       <span className="tabular w-6 text-center text-sm">{line.qty}</span>
                       <button
                         type="button"
-                        className="focus-ring h-8 w-8 rounded-md border text-sm"
+                        className="focus-ring h-8 w-8 rounded-md border text-sm transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
                         style={{ borderColor: "var(--border)" }}
                         onClick={() => updateQty(line.key, line.qty + 1)}
                       >
@@ -452,116 +470,133 @@ export function SalePage() {
         </div>
       </section>
 
-      <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:border-l lg:pl-4" style={{ borderColor: "var(--border)" }}>
-        <h2 className="text-base font-semibold tracking-tight">Totals</h2>
-        <dl className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-[var(--text-secondary)]">Subtotal</dt>
-            <dd className="tabular font-medium">{formatCurrency(totals.subtotal)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-[var(--text-secondary)]">Discount</dt>
-            <dd className="tabular">−{formatCurrency(totals.discount_amount)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-[var(--text-secondary)]">Tax</dt>
-            <dd className="tabular">{formatCurrency(totals.tax_amount)}</dd>
-          </div>
-          <div className="flex justify-between border-t pt-2 text-base" style={{ borderColor: "var(--border)" }}>
-            <dt className="font-semibold">Total</dt>
-            <dd className="tabular font-semibold">{formatCurrency(totals.total)}</dd>
-          </div>
-        </dl>
+      <aside
+        className={`flex min-h-0 flex-col gap-2 overflow-y-auto border-[var(--border)] ${
+          narrow
+            ? "shrink-0 border-t pt-3"
+            : "lg:border-l lg:pl-4"
+        }`}
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-base font-semibold tracking-tight">Totals</h2>
+          <p className="tabular text-xl font-semibold">{formatCurrency(totals.total)}</p>
+        </div>
+        {!ultraCompact ? (
+          <dl className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-[var(--text-secondary)]">Subtotal</dt>
+              <dd className="tabular font-medium">{formatCurrency(totals.subtotal)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-[var(--text-secondary)]">Discount</dt>
+              <dd className="tabular">−{formatCurrency(totals.discount_amount)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-[var(--text-secondary)]">Tax</dt>
+              <dd className="tabular">{formatCurrency(totals.tax_amount)}</dd>
+            </div>
+          </dl>
+        ) : null}
 
-        <Field label="Discount">
-          <div className="grid grid-cols-[1fr_80px] gap-2">
-            <input
-              className={`${inputClass} tabular`}
-              style={inputStyle()}
-              value={discountValue}
-              onChange={(e) => setDiscountValue(e.target.value)}
-            />
-            <select
-              className={inputClass}
-              style={inputStyle()}
-              value={discountType}
-              onChange={(e) => setDiscountType(e.target.value as DiscountType)}
-            >
-              <option value="percent">%</option>
-              <option value="fixed">$</option>
-            </select>
-          </div>
-        </Field>
-        <Field label="Apply discount">
-          <select
-            className={inputClass}
-            style={inputStyle()}
-            value={discountTiming}
-            onChange={(e) => setDiscountTiming(e.target.value as DiscountTiming)}
-          >
-            <option value="before_tax">Before tax</option>
-            <option value="after_tax">After tax</option>
-          </select>
-        </Field>
-        <Field label="Notes">
-          <textarea
-            className={`${inputClass} min-h-16 resize-y`}
-            style={inputStyle()}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional note"
-          />
-        </Field>
+        {!ultraCompact ? (
+          <>
+            <Field label="Discount">
+              <div className="grid grid-cols-[1fr_80px] gap-2">
+                <input
+                  className={`${inputClass} tabular`}
+                  style={inputStyle()}
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                />
+                <select
+                  className={inputClass}
+                  style={inputStyle()}
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as DiscountType)}
+                >
+                  <option value="percent">%</option>
+                  <option value="fixed">$</option>
+                </select>
+              </div>
+            </Field>
+            {!compact ? (
+              <>
+                <Field label="Apply discount">
+                  <select
+                    className={inputClass}
+                    style={inputStyle()}
+                    value={discountTiming}
+                    onChange={(e) => setDiscountTiming(e.target.value as DiscountTiming)}
+                  >
+                    <option value="before_tax">Before tax</option>
+                    <option value="after_tax">After tax</option>
+                  </select>
+                </Field>
+                <Field label="Notes">
+                  <textarea
+                    className={`${inputClass} min-h-12 resize-y`}
+                    style={inputStyle()}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Optional note"
+                  />
+                </Field>
+              </>
+            ) : null}
+          </>
+        ) : null}
 
-        <div className="mt-auto flex flex-col gap-2 pt-2">
+        <div className="mt-auto flex shrink-0 flex-col gap-2 border-t pt-2" style={{ borderColor: "var(--border)" }}>
           <Button variant="primary" className="w-full py-3" onClick={beginComplete}>
-            Complete sale · F12
+            Complete sale · {shortcutLabel("F12", "⌘ ⏎")}
           </Button>
-          <Button
-            className="w-full"
-            onClick={() => {
-              if (!lines.length) {
-                toast.push("Nothing to preview yet", "error");
-                return;
-              }
-              const db = getDatabase();
-              openReceiptPrintDialog(
-                {
-                  id: null,
-                  invoice_number: "PREVIEW",
-                  customer_name: customerName,
-                  customer_phone: customerPhone,
-                  customer_email: customerEmail,
-                  subtotal: totals.subtotal,
-                  tax_rate: taxRate,
-                  tax_amount: totals.tax_amount,
-                  total: totals.total,
-                  payment_method: payment,
-                  notes,
-                  created_at: new Date().toLocaleString(),
-                  items: lines,
-                  discount_type: discountType,
-                  discount_value: Number(discountValue) || 0,
-                  discount_amount: totals.discount_amount,
-                  discount_timing: discountTiming,
-                },
-                getAllSettings(db),
-              );
-            }}
-          >
-            Preview · F11
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full"
-            onClick={() => {
-              setLines([]);
-              setNotes("");
-              setDiscountValue("0");
-            }}
-          >
-            Clear sale
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (!lines.length) {
+                  toast.push("Nothing to preview yet", "error");
+                  return;
+                }
+                const db = getDatabase();
+                openReceiptPrintDialog(
+                  {
+                    id: null,
+                    invoice_number: "PREVIEW",
+                    customer_name: customerName,
+                    customer_phone: customerPhone,
+                    customer_email: customerEmail,
+                    subtotal: totals.subtotal,
+                    tax_rate: taxRate,
+                    tax_amount: totals.tax_amount,
+                    total: totals.total,
+                    payment_method: payment,
+                    notes,
+                    created_at: new Date().toLocaleString(),
+                    items: lines,
+                    discount_type: discountType,
+                    discount_value: Number(discountValue) || 0,
+                    discount_amount: totals.discount_amount,
+                    discount_timing: discountTiming,
+                  },
+                  getAllSettings(db),
+                );
+              }}
+            >
+              Preview
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                setLines([]);
+                setNotes("");
+                setDiscountValue("0");
+              }}
+            >
+              Clear
+            </Button>
+          </div>
         </div>
       </aside>
 

@@ -13,6 +13,9 @@ import type { AppSettings, ThemePreference } from "../lib/types";
 import { useTheme } from "../theme/ThemeProvider";
 import { useToast } from "../components/Toast";
 import { Button, Field, inputClass, inputStyle } from "../components/ui";
+import { ShortcutsPanel } from "../components/ShortcutsPanel";
+import { openReceiptPrintDialog, sampleTestInvoice } from "../lib/receiptPdf";
+import { emailStatus, printerStatus, statusLabel } from "../lib/status";
 import { saveAs } from "file-saver";
 
 const RECEIPT_TOGGLES: { key: keyof AppSettings; label: string }[] = [
@@ -31,12 +34,22 @@ const RECEIPT_TOGGLES: { key: keyof AppSettings; label: string }[] = [
   { key: "receipt_show_gst", label: "Tax ID" },
 ];
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export function SetupPage({ onSaved }: { onSaved?: () => void }) {
   const toast = useToast();
   const { preference, setPreference } = useTheme();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [advanced, setAdvanced] = useState(false);
   const [dbPath, setDbPath] = useState("");
+  const [testingPrint, setTestingPrint] = useState(false);
 
   useEffect(() => {
     setSettings(getAllSettings(getDatabase()));
@@ -44,16 +57,17 @@ export function SetupPage({ onSaved }: { onSaved?: () => void }) {
   }, []);
 
   if (!settings) return null;
+  const current = settings;
 
   function update<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 
-  function save() {
-    if (!settings) return;
-    saveSettings(getDatabase(), settings);
+  function save(next?: AppSettings) {
+    const payload = next ?? current;
+    saveSettings(getDatabase(), payload);
     schedulePersist();
-    setPreference((settings.theme_preference as ThemePreference) || "light");
+    setPreference((payload.theme_preference as ThemePreference) || "light");
     toast.push("Settings saved", "success");
     onSaved?.();
   }
@@ -85,8 +99,62 @@ export function SetupPage({ onSaved }: { onSaved?: () => void }) {
     toast.push("Database restored from backup", "success");
   }
 
+  async function onLogoSelected(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.push("Choose a PNG or JPG logo", "error");
+      return;
+    }
+    if (file.size > 1_500_000) {
+      toast.push("Logo should be under 1.5 MB", "error");
+      return;
+    }
+    const dataUrl = await readFileAsDataUrl(file);
+    const next: AppSettings = { ...current, logo_data: dataUrl, receipt_show_logo: "1" };
+    setSettings(next);
+    save(next);
+    toast.push("Logo added to receipts", "success");
+  }
+
+  function clearLogo() {
+    const next: AppSettings = { ...current, logo_data: "" };
+    setSettings(next);
+    save(next);
+  }
+
+  function testPrinter() {
+    setTestingPrint(true);
+    try {
+      openReceiptPrintDialog(sampleTestInvoice(), current);
+      const next: AppSettings = {
+        ...current,
+        printer_status: "ready",
+        printer_last_test: new Date().toISOString(),
+      };
+      setSettings(next);
+      saveSettings(getDatabase(), next);
+      schedulePersist();
+      toast.push("Print dialog opened. Confirm on your printer.", "success");
+      onSaved?.();
+    } catch {
+      const next: AppSettings = {
+        ...current,
+        printer_status: "failed",
+        printer_last_test: new Date().toISOString(),
+      };
+      setSettings(next);
+      saveSettings(getDatabase(), next);
+      schedulePersist();
+      toast.push("Could not open the print dialog", "error");
+    } finally {
+      setTestingPrint(false);
+    }
+  }
+
+  const pStatus = printerStatus(current);
+  const eStatus = emailStatus(current);
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-3xl pb-8">
       <h2 className="text-xl font-semibold tracking-tight">Setup</h2>
       <p className="text-sm text-[var(--text-secondary)] text-pretty">
         All data stays on this computer. Nothing is uploaded.
@@ -201,8 +269,74 @@ export function SetupPage({ onSaved }: { onSaved?: () => void }) {
         </Field>
       </section>
 
-      <section className="mt-10 space-y-3">
-        <h3 className="text-lg font-semibold">Data on this computer</h3>
+      <section className="mt-8 space-y-3">
+        <h3 className="text-base font-semibold">Receipt logo</h3>
+        <p className="text-sm text-[var(--text-secondary)]">
+          PNG or JPG. Shown at the top of printed receipts when Logo is enabled.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {settings.logo_data ? (
+            <img
+              src={settings.logo_data}
+              alt="Store logo"
+              className="h-16 w-16 rounded-lg object-contain"
+              style={{ background: "var(--bg-deep)" }}
+            />
+          ) : (
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-lg text-xs text-[var(--text-tertiary)]"
+              style={{ background: "var(--bg-deep)" }}
+            >
+              No logo
+            </div>
+          )}
+          <label
+            className="focus-ring inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
+            style={{ borderColor: "var(--border-strong)", background: "var(--surface)" }}
+          >
+            Upload logo
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void onLogoSelected(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {settings.logo_data ? (
+            <Button variant="ghost" onClick={clearLogo}>
+              Remove
+            </Button>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="mt-8 space-y-3">
+        <h3 className="text-base font-semibold">Printer</h3>
+        <p className="text-sm text-[var(--text-secondary)]">
+          Status: <span className="font-semibold text-[var(--text)]">{statusLabel("printer", pStatus)}</span>
+          {settings.printer_last_test
+            ? ` · last test ${new Date(settings.printer_last_test).toLocaleString()}`
+            : ""}
+        </p>
+        <p className="text-sm text-[var(--text-secondary)] text-pretty">
+          Test opens your system print dialog with a sample receipt. Choose your receipt printer there.
+        </p>
+        <Button variant="primary" disabled={testingPrint} onClick={testPrinter}>
+          {testingPrint ? "Opening…" : "Test print connection"}
+        </Button>
+      </section>
+
+      <section className="mt-8 space-y-3">
+        <h3 className="text-base font-semibold">Keyboard shortcuts</h3>
+        <ShortcutsPanel />
+      </section>
+
+      <section className="mt-8 space-y-3">
+        <h3 className="text-base font-semibold">Data on this computer</h3>
         <p className="text-sm text-[var(--text-secondary)]">Database location: {dbPath}</p>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => void backup()}>Download backup</Button>
@@ -226,7 +360,7 @@ export function SetupPage({ onSaved }: { onSaved?: () => void }) {
             className="focus-ring inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-base font-semibold"
             style={{ borderColor: "var(--border-strong)", background: "var(--surface)" }}
           >
-            Import previous Retail Invoice database
+            Import previous database
             <input
               type="file"
               accept=".db,application/octet-stream"
@@ -241,7 +375,7 @@ export function SetupPage({ onSaved }: { onSaved?: () => void }) {
         </div>
       </section>
 
-      <div className="mt-10">
+      <div className="mt-8">
         <button
           type="button"
           className="focus-ring text-sm font-semibold text-[var(--accent)]"
@@ -254,7 +388,7 @@ export function SetupPage({ onSaved }: { onSaved?: () => void }) {
       {advanced ? (
         <>
           <section className="mt-6 space-y-3">
-            <h3 className="text-lg font-semibold">Receipt design</h3>
+            <h3 className="text-base font-semibold">Receipt design</h3>
             <div className="grid gap-2 sm:grid-cols-2">
               {RECEIPT_TOGGLES.map((t) => (
                 <label key={t.key} className="flex items-center gap-2 text-sm">
@@ -270,9 +404,10 @@ export function SetupPage({ onSaved }: { onSaved?: () => void }) {
           </section>
 
           <section className="mt-8 space-y-3">
-            <h3 className="text-lg font-semibold">Email receipts (optional)</h3>
+            <h3 className="text-base font-semibold">Email receipts (optional)</h3>
             <p className="text-sm text-[var(--text-secondary)]">
-              Only used when you press Email on a sale. Credentials stay in your local database.
+              Status: <span className="font-semibold text-[var(--text)]">{statusLabel("email", eStatus)}</span>
+              . Only used when you press Email on a sale.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="SMTP host">
@@ -321,8 +456,8 @@ export function SetupPage({ onSaved }: { onSaved?: () => void }) {
         </>
       ) : null}
 
-      <div className="mt-10">
-        <Button variant="primary" onClick={save}>
+      <div className="mt-8">
+        <Button variant="primary" onClick={() => save()}>
           Save settings
         </Button>
       </div>

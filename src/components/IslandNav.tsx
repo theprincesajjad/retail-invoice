@@ -1,11 +1,13 @@
 import { Package, Receipt, ClockCounterClockwise, GearSix } from "@phosphor-icons/react";
 import type { AppTab } from "../lib/types";
+import { tabShortcut } from "../lib/platform";
+import { StatusPill } from "./StatusPill";
 
-const TABS: { id: AppTab; label: string; shortcut: string; icon: typeof Receipt }[] = [
-  { id: "sale", label: "Sale", shortcut: "F1", icon: Receipt },
-  { id: "products", label: "Products", shortcut: "F2", icon: Package },
-  { id: "history", label: "History", shortcut: "F3", icon: ClockCounterClockwise },
-  { id: "setup", label: "Setup", shortcut: "F4", icon: GearSix },
+const TABS: { id: AppTab; label: string; index: 1 | 2 | 3 | 4; icon: typeof Receipt }[] = [
+  { id: "sale", label: "Sale", index: 1, icon: Receipt },
+  { id: "products", label: "Products", index: 2, icon: Package },
+  { id: "history", label: "History", index: 3, icon: ClockCounterClockwise },
+  { id: "setup", label: "Setup", index: 4, icon: GearSix },
 ];
 
 export function IslandNav({
@@ -48,7 +50,7 @@ export function IslandNav({
                 key={tab.id}
                 type="button"
                 onClick={() => onChange(tab.id)}
-                className="focus-ring flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]"
+                className="focus-ring flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold transition-[transform,background-color,color] duration-160 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
                 style={{
                   background: selected ? "var(--accent-soft)" : "transparent",
                   color: selected ? "var(--accent)" : "var(--text-secondary)",
@@ -58,16 +60,14 @@ export function IslandNav({
                 <Icon size={16} weight={selected ? "fill" : "regular"} />
                 <span>{tab.label}</span>
                 <span className="hidden text-xs text-[var(--text-tertiary)] lg:inline">
-                  {tab.shortcut}
+                  {tabShortcut(tab.index)}
                 </span>
               </button>
             );
           })}
         </nav>
 
-        <p className="ml-auto hidden shrink-0 text-xs text-[var(--text-tertiary)] xl:block">
-          Local only
-        </p>
+        <StatusPill onGoSetup={onChange} />
       </div>
     </header>
   );

@@ -81,6 +81,9 @@ export interface AppSettings {
   smtp_from_name: string;
   setup_complete: string;
   theme_preference: ThemePreference | string;
+  logo_data: string;
+  printer_status: string;
+  printer_last_test: string;
   [key: string]: string;
 }
 
@@ -96,6 +99,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tax_rate: "0.13",
   discount_timing: "before_tax",
   logo_path: "",
+  logo_data: "",
   receipt_width: "80mm",
   receipt_font_size: "normal",
   receipt_header_spacing: "normal",
@@ -119,6 +123,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   smtp_from_name: "My Business",
   setup_complete: "",
   theme_preference: "light",
+  printer_status: "untested",
+  printer_last_test: "",
 };
 
 export interface InvoiceTotals {
