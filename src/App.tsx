@@ -65,7 +65,7 @@ export default function App() {
 
   if (error) {
     return (
-      <div className="flex min-h-dvh items-center justify-center p-8">
+      <div className="flex h-dvh items-center justify-center p-8">
         <div className="max-w-md">
           <h1 className="text-2xl font-semibold">Could not start</h1>
           <p className="mt-2 text-[var(--text-secondary)]">{error}</p>
@@ -76,7 +76,7 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="flex min-h-dvh items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <p className="text-[var(--text-secondary)]">Opening local database…</p>
       </div>
     );
@@ -89,19 +89,17 @@ export default function App() {
           Skip to content
         </a>
         <div className="grain" aria-hidden />
-        <IslandNav active={tab} onChange={setTab} businessName={businessName} />
-        <main id="main" className="px-4 pb-16 pt-8">
-          {tab === "sale" ? <SalePage /> : null}
-          {tab === "products" ? <ProductsPage /> : null}
-          {tab === "history" ? <HistoryPage /> : null}
-          {tab === "setup" ? <SetupPage onSaved={refreshBrand} /> : null}
-        </main>
-        <footer
-          className="border-t px-4 py-6 text-center text-xs text-[var(--text-tertiary)]"
-          style={{ borderColor: "var(--border)" }}
-        >
-          Retail Invoice · local only · v2.0.1
-        </footer>
+        <div className="flex h-dvh flex-col overflow-hidden">
+          <IslandNav active={tab} onChange={setTab} businessName={businessName} />
+          <main id="main" className="min-h-0 flex-1 overflow-hidden px-4 py-3">
+            <div className="h-full overflow-y-auto">
+              {tab === "sale" ? <div className="h-full overflow-hidden"><SalePage /></div> : null}
+              {tab === "products" ? <ProductsPage /> : null}
+              {tab === "history" ? <HistoryPage /> : null}
+              {tab === "setup" ? <SetupPage onSaved={refreshBrand} /> : null}
+            </div>
+          </main>
+        </div>
         {showWizard ? (
           <SetupWizard
             onDone={() => {

@@ -118,21 +118,21 @@ export function ProductsPage() {
 
   return (
     <div className="mx-auto max-w-[1440px]">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Products</h2>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Keep stock here. Import a spreadsheet when you have a long list.
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold tracking-tight">Products</h2>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Stock list · import a spreadsheet when you need a batch
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={openCreate}>
-            Add product · Alt+N
+            Add product
           </Button>
           <label className="focus-ring inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-base font-semibold transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]"
             style={{ background: "var(--surface)", borderColor: "var(--border-strong)", color: "var(--text)" }}
           >
-            Import spreadsheet
+            Import
             <input
               type="file"
               accept=".csv,.xlsx,.xls"
@@ -146,15 +146,15 @@ export function ProductsPage() {
           </label>
           <a
             className="focus-ring inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-[var(--accent)]"
-            href="/templates/product_import_template.csv"
+            href="./templates/product_import_template.csv"
             download
           >
-            Download template
+            Template
           </a>
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-3">
         <Field label="Search products">
           <input
             className={inputClass}
@@ -175,7 +175,7 @@ export function ProductsPage() {
         </p>
       ) : null}
 
-      <div className="mt-6">
+      <div className="mt-3">
         {loading ? (
           <SkeletonRows />
         ) : !products.length ? (

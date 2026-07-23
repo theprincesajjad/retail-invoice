@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.2] — 2026-07-23
+
+### UI
+
+- Compact top bar: business name top-left, menu beside it (no tall centered hero)
+- App fills the window height; Sale keeps chrome fixed and scrolls only the line items
+- Tighter Products / History / Setup headers so pages fit without forced page scroll
+
+### Docs
+
+- Mac Gatekeeper workaround for unsigned beta (xattr / right-click Open)
+
 ## [2.0.1] — 2026-07-23
 
 ### Fix

@@ -1,6 +1,6 @@
 [package]
 name = "retail-invoice"
-version = "2.0.1"
+version = "2.0.2"
 description = "Local-first invoicing and inventory for small businesses"
 authors = ["Retail Invoice"]
 license = "MIT"

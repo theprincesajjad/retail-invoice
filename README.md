@@ -12,7 +12,22 @@ Built so anyone can complete a sale quickly, with a clean interface and optional
 2. Download the installer for your system (Windows `.msi` / `.exe` or macOS `.dmg`)
 3. Open the app — no account, no internet required
 
-Current version: **2.0.0**
+Current version: **2.0.2**
+
+### Mac: “damaged and can’t be opened”
+
+Unsigned beta builds trip Gatekeeper. After installing from the `.dmg`:
+
+1. Open **Terminal**
+2. Run:
+
+```bash
+xattr -cr "/Applications/Retail Invoice.app"
+```
+
+3. Open **Retail Invoice** from Applications again
+
+Or: right-click the app → **Open** → confirm. Apple Developer signing/notarization can remove this step in a later release.
 
 ---
 

@@ -87,11 +87,11 @@ export function HistoryPage() {
 
   return (
     <div className="mx-auto max-w-[1440px]">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Sales history</h2>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Review, reprint, or email receipts from sales on this computer.
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold tracking-tight">Sales history</h2>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Reprint or email receipts from this computer
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -108,30 +108,30 @@ export function HistoryPage() {
             <option value="year">This year</option>
             <option value="all">All time</option>
           </select>
-          <Button onClick={refresh}>Refresh · Alt+R</Button>
+          <Button onClick={refresh}>Refresh</Button>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 sm:grid-cols-3">
+      <div className="mt-3 grid gap-4 sm:grid-cols-3">
         <div>
-          <p className="text-sm text-[var(--text-tertiary)]">Sales</p>
-          <p className="tabular mt-1 text-3xl font-semibold tracking-tight">{stats.count}</p>
+          <p className="text-xs text-[var(--text-tertiary)]">Sales</p>
+          <p className="tabular text-2xl font-semibold tracking-tight">{stats.count}</p>
         </div>
         <div>
-          <p className="text-sm text-[var(--text-tertiary)]">Revenue</p>
-          <p className="tabular mt-1 text-3xl font-semibold tracking-tight">
+          <p className="text-xs text-[var(--text-tertiary)]">Revenue</p>
+          <p className="tabular text-2xl font-semibold tracking-tight">
             {formatCurrency(stats.revenue)}
           </p>
         </div>
         <div>
-          <p className="text-sm text-[var(--text-tertiary)]">Average ticket</p>
-          <p className="tabular mt-1 text-3xl font-semibold tracking-tight">
+          <p className="text-xs text-[var(--text-tertiary)]">Average ticket</p>
+          <p className="tabular text-2xl font-semibold tracking-tight">
             {formatCurrency(stats.avg)}
           </p>
         </div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-3">
         <Field label="Search">
           <input
             className={inputClass}
@@ -143,7 +143,7 @@ export function HistoryPage() {
         </Field>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-3">
         {loading ? (
           <SkeletonRows />
         ) : !invoices.length ? (

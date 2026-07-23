@@ -263,9 +263,9 @@ export function SalePage() {
   }, [lines, paymentOpen, confirmOpen, totals, customerName, customerPhone, customerEmail, notes, payment, discountType, discountValue, discountTiming, taxRate]);
 
   return (
-    <div className="mx-auto grid max-w-[1440px] gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
-      <section className="min-w-0">
-        <div className="grid gap-3 sm:grid-cols-3">
+    <div className="mx-auto grid h-full max-w-[1440px] gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:grid-rows-1">
+      <section className="flex min-h-0 min-w-0 flex-col gap-3">
+        <div className="grid shrink-0 gap-2 sm:grid-cols-3">
           <Field label="Name">
             <input
               className={inputClass}
@@ -295,7 +295,7 @@ export function SalePage() {
           </Field>
         </div>
 
-        <div className="mt-8 grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
+        <div className="grid shrink-0 gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]">
           <Field label="Search">
             <input
               className={inputClass}
@@ -337,7 +337,7 @@ export function SalePage() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        <div className="grid shrink-0 gap-2 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_72px_100px_auto]">
           <Field label="Custom item">
             <input
               className={inputClass}
@@ -364,23 +364,23 @@ export function SalePage() {
               onChange={(e) => setManualQty(e.target.value)}
             />
           </Field>
-          <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-            <Field label="Price">
-              <input
-                className={`${inputClass} tabular`}
-                style={inputStyle()}
-                value={manualPrice}
-                onChange={(e) => setManualPrice(e.target.value)}
-                placeholder="0.00"
-              />
-            </Field>
+          <Field label="Price">
+            <input
+              className={`${inputClass} tabular`}
+              style={inputStyle()}
+              value={manualPrice}
+              onChange={(e) => setManualPrice(e.target.value)}
+              placeholder="0.00"
+            />
+          </Field>
+          <div className="flex items-end">
             <Button onClick={addManual}>Add</Button>
           </div>
         </div>
 
-        <div className="mt-8">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div
-            className="grid grid-cols-[minmax(0,1fr)_72px_100px_100px_44px] gap-2 border-b pb-2 text-sm text-[var(--text-secondary)]"
+            className="grid shrink-0 grid-cols-[minmax(0,1fr)_72px_100px_100px_44px] gap-2 border-b pb-2 text-sm text-[var(--text-secondary)]"
             style={{ borderColor: "var(--border)" }}
           >
             <span>Item</span>
@@ -389,178 +389,179 @@ export function SalePage() {
             <span className="text-right">Total</span>
             <span />
           </div>
-          {!lines.length ? (
-            <EmptyState
-              title="Ready for the next sale"
-              body="Search a product or add a custom line. Complete sale when the cart looks right."
-            />
-          ) : (
-            <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
-              {lines.map((line) => (
-                <li
-                  key={line.key}
-                  className="grid grid-cols-[minmax(0,1fr)_72px_100px_100px_44px] items-center gap-2 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{line.description}</p>
-                    {line.serial_number ? (
-                      <p className="truncate text-sm text-[var(--text-tertiary)]">
-                        {line.serial_number}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="focus-ring h-8 w-8 rounded-md border text-sm"
-                      style={{ borderColor: "var(--border)" }}
-                      onClick={() => updateQty(line.key, line.qty - 1)}
-                    >
-                      −
-                    </button>
-                    <span className="tabular w-6 text-center text-sm">{line.qty}</span>
-                    <button
-                      type="button"
-                      className="focus-ring h-8 w-8 rounded-md border text-sm"
-                      style={{ borderColor: "var(--border)" }}
-                      onClick={() => updateQty(line.key, line.qty + 1)}
-                    >
-                      +
-                    </button>
-                  </div>
-                  <span className="tabular text-right text-sm">
-                    {formatCurrency(line.unit_price)}
-                  </span>
-                  <span className="tabular text-right font-medium">
-                    {formatCurrency(line.line_total)}
-                  </span>
-                  <button
-                    type="button"
-                    className="focus-ring text-sm text-[var(--danger)]"
-                    onClick={() => removeLine(line.key)}
-                    aria-label="Remove line"
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {!lines.length ? (
+              <EmptyState
+                compact
+                title="Ready for the next sale"
+                body="Search a product or add a custom line."
+              />
+            ) : (
+              <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
+                {lines.map((line) => (
+                  <li
+                    key={line.key}
+                    className="grid grid-cols-[minmax(0,1fr)_72px_100px_100px_44px] items-center gap-2 py-2"
                   >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{line.description}</p>
+                      {line.serial_number ? (
+                        <p className="truncate text-sm text-[var(--text-tertiary)]">
+                          {line.serial_number}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="focus-ring h-8 w-8 rounded-md border text-sm"
+                        style={{ borderColor: "var(--border)" }}
+                        onClick={() => updateQty(line.key, line.qty - 1)}
+                      >
+                        −
+                      </button>
+                      <span className="tabular w-6 text-center text-sm">{line.qty}</span>
+                      <button
+                        type="button"
+                        className="focus-ring h-8 w-8 rounded-md border text-sm"
+                        style={{ borderColor: "var(--border)" }}
+                        onClick={() => updateQty(line.key, line.qty + 1)}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="tabular text-right text-sm">
+                      {formatCurrency(line.unit_price)}
+                    </span>
+                    <span className="tabular text-right font-medium">
+                      {formatCurrency(line.line_total)}
+                    </span>
+                    <button
+                      type="button"
+                      className="focus-ring text-sm text-[var(--danger)]"
+                      onClick={() => removeLine(line.key)}
+                      aria-label="Remove line"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </section>
 
-      <aside className="lg:sticky lg:top-36 lg:self-start">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold tracking-tight">Totals</h2>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-[var(--text-secondary)]">Subtotal</dt>
-              <dd className="tabular font-medium">{formatCurrency(totals.subtotal)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-[var(--text-secondary)]">Discount</dt>
-              <dd className="tabular">−{formatCurrency(totals.discount_amount)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-[var(--text-secondary)]">Tax</dt>
-              <dd className="tabular">{formatCurrency(totals.tax_amount)}</dd>
-            </div>
-            <div className="flex justify-between border-t pt-2 text-base" style={{ borderColor: "var(--border)" }}>
-              <dt className="font-semibold">Total</dt>
-              <dd className="tabular font-semibold">{formatCurrency(totals.total)}</dd>
-            </div>
-          </dl>
+      <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:border-l lg:pl-4" style={{ borderColor: "var(--border)" }}>
+        <h2 className="text-base font-semibold tracking-tight">Totals</h2>
+        <dl className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <dt className="text-[var(--text-secondary)]">Subtotal</dt>
+            <dd className="tabular font-medium">{formatCurrency(totals.subtotal)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-[var(--text-secondary)]">Discount</dt>
+            <dd className="tabular">−{formatCurrency(totals.discount_amount)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-[var(--text-secondary)]">Tax</dt>
+            <dd className="tabular">{formatCurrency(totals.tax_amount)}</dd>
+          </div>
+          <div className="flex justify-between border-t pt-2 text-base" style={{ borderColor: "var(--border)" }}>
+            <dt className="font-semibold">Total</dt>
+            <dd className="tabular font-semibold">{formatCurrency(totals.total)}</dd>
+          </div>
+        </dl>
 
-          <Field label="Discount">
-            <div className="grid grid-cols-[1fr_100px] gap-2">
-              <input
-                className={`${inputClass} tabular`}
-                style={inputStyle()}
-                value={discountValue}
-                onChange={(e) => setDiscountValue(e.target.value)}
-              />
-              <select
-                className={inputClass}
-                style={inputStyle()}
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value as DiscountType)}
-              >
-                <option value="percent">%</option>
-                <option value="fixed">$</option>
-              </select>
-            </div>
-          </Field>
-          <Field label="Apply discount">
+        <Field label="Discount">
+          <div className="grid grid-cols-[1fr_80px] gap-2">
+            <input
+              className={`${inputClass} tabular`}
+              style={inputStyle()}
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value)}
+            />
             <select
               className={inputClass}
               style={inputStyle()}
-              value={discountTiming}
-              onChange={(e) => setDiscountTiming(e.target.value as DiscountTiming)}
+              value={discountType}
+              onChange={(e) => setDiscountType(e.target.value as DiscountType)}
             >
-              <option value="before_tax">Before tax</option>
-              <option value="after_tax">After tax</option>
+              <option value="percent">%</option>
+              <option value="fixed">$</option>
             </select>
-          </Field>
-          <Field label="Notes">
-            <textarea
-              className={`${inputClass} min-h-20 resize-y`}
-              style={inputStyle()}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional note on the receipt"
-            />
-          </Field>
-
-          <div className="flex flex-col gap-2 pt-2">
-            <Button variant="primary" className="w-full py-3" onClick={beginComplete}>
-              Complete sale · F12
-            </Button>
-            <Button
-              className="w-full"
-              onClick={() => {
-                if (!lines.length) {
-                  toast.push("Nothing to preview yet", "error");
-                  return;
-                }
-                const db = getDatabase();
-                openReceiptPrintDialog(
-                  {
-                    id: null,
-                    invoice_number: "PREVIEW",
-                    customer_name: customerName,
-                    customer_phone: customerPhone,
-                    customer_email: customerEmail,
-                    subtotal: totals.subtotal,
-                    tax_rate: taxRate,
-                    tax_amount: totals.tax_amount,
-                    total: totals.total,
-                    payment_method: payment,
-                    notes,
-                    created_at: new Date().toLocaleString(),
-                    items: lines,
-                    discount_type: discountType,
-                    discount_value: Number(discountValue) || 0,
-                    discount_amount: totals.discount_amount,
-                    discount_timing: discountTiming,
-                  },
-                  getAllSettings(db),
-                );
-              }}
-            >
-              Preview receipt · F11
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full"
-              onClick={() => {
-                setLines([]);
-                setNotes("");
-                setDiscountValue("0");
-              }}
-            >
-              Clear sale
-            </Button>
           </div>
+        </Field>
+        <Field label="Apply discount">
+          <select
+            className={inputClass}
+            style={inputStyle()}
+            value={discountTiming}
+            onChange={(e) => setDiscountTiming(e.target.value as DiscountTiming)}
+          >
+            <option value="before_tax">Before tax</option>
+            <option value="after_tax">After tax</option>
+          </select>
+        </Field>
+        <Field label="Notes">
+          <textarea
+            className={`${inputClass} min-h-16 resize-y`}
+            style={inputStyle()}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Optional note"
+          />
+        </Field>
+
+        <div className="mt-auto flex flex-col gap-2 pt-2">
+          <Button variant="primary" className="w-full py-3" onClick={beginComplete}>
+            Complete sale · F12
+          </Button>
+          <Button
+            className="w-full"
+            onClick={() => {
+              if (!lines.length) {
+                toast.push("Nothing to preview yet", "error");
+                return;
+              }
+              const db = getDatabase();
+              openReceiptPrintDialog(
+                {
+                  id: null,
+                  invoice_number: "PREVIEW",
+                  customer_name: customerName,
+                  customer_phone: customerPhone,
+                  customer_email: customerEmail,
+                  subtotal: totals.subtotal,
+                  tax_rate: taxRate,
+                  tax_amount: totals.tax_amount,
+                  total: totals.total,
+                  payment_method: payment,
+                  notes,
+                  created_at: new Date().toLocaleString(),
+                  items: lines,
+                  discount_type: discountType,
+                  discount_value: Number(discountValue) || 0,
+                  discount_amount: totals.discount_amount,
+                  discount_timing: discountTiming,
+                },
+                getAllSettings(db),
+              );
+            }}
+          >
+            Preview · F11
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setLines([]);
+              setNotes("");
+              setDiscountValue("0");
+            }}
+          >
+            Clear sale
+          </Button>
         </div>
       </aside>
 
