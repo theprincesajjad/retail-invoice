@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import initSqlJs from "sql.js";
 import {
   addProduct,
+  applySkuPrefixCategories,
   generateInvoiceNumber,
+  getSetting,
   initSchema,
   saveInvoice,
+  saveSetting,
   searchInvoices,
   searchProducts,
 } from "../db/queries";
@@ -24,6 +27,7 @@ describe("database queries", () => {
       price: 42,
       qty: 10,
       category: "",
+      import_date: "",
     };
     const id = addProduct(db, product);
     expect(id).toBeGreaterThan(0);
@@ -72,5 +76,38 @@ describe("database queries", () => {
     const invoices = searchInvoices(db, "Sam");
     expect(invoices).toHaveLength(1);
     expect(invoices[0].items).toHaveLength(1);
+  });
+
+  it("batch-assigns categories for SKU prefixes 92 and 110", async () => {
+    const SQL = await initSqlJs();
+    const db = new SQL.Database() as unknown as Parameters<typeof initSchema>[0];
+    initSchema(db);
+    // Allow re-run of the one-time batch
+    saveSetting(db, "sku_prefix_categories_v1", "");
+
+    addProduct(db, {
+      id: null,
+      name: "ThinkPad",
+      serial_number: "",
+      sku: "92055",
+      price: 100,
+      qty: 1,
+      category: "",
+    });
+    addProduct(db, {
+      id: null,
+      name: "Pixel",
+      serial_number: "",
+      sku: "110200",
+      price: 200,
+      qty: 2,
+      category: "",
+    });
+
+    applySkuPrefixCategories(db);
+
+    expect(searchProducts(db, "92055")[0].category).toBe("Laptops");
+    expect(searchProducts(db, "110200")[0].category).toBe("Cell Phones");
+    expect(getSetting(db, "sku_prefix_categories_v1")).toBe("1");
   });
 });

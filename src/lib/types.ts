@@ -12,6 +12,8 @@ export interface Product {
   price: number;
   qty: number;
   category: string;
+  /** Last CSV import date stamp (YYYY-MM-DD). Blank rows are eligible to import. */
+  import_date?: string;
   created_at?: string;
 }
 

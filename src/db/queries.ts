@@ -27,6 +27,7 @@ export function initSchema(db: SqlJsDatabase): void {
       price REAL NOT NULL,
       qty INTEGER NOT NULL,
       category TEXT,
+      import_date TEXT DEFAULT '',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -71,9 +72,51 @@ export function initSchema(db: SqlJsDatabase): void {
     );
   `);
 
+  ensureColumn(db, "products", "import_date", "TEXT DEFAULT ''");
+  ensureColumn(db, "products", "category", "TEXT DEFAULT ''");
+
   for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
     db.run("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", [key, value]);
   }
+
+  applySkuPrefixCategories(db);
+}
+
+/** Add a column if missing (existing local DBs). */
+function ensureColumn(
+  db: SqlJsDatabase,
+  table: string,
+  column: string,
+  definition: string,
+): void {
+  const info = db.exec(`PRAGMA table_info(${table})`);
+  if (!info.length) return;
+  const cols = info[0].values.map((row) => String(row[1]));
+  if (cols.includes(column)) return;
+  try {
+    db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  } catch {
+    // column may already exist in race conditions
+  }
+}
+
+/**
+ * Batch: SKU 92* → Laptops, SKU 110* → Cell Phones.
+ * Runs once per database (settings flag), then store can edit categories freely.
+ */
+export function applySkuPrefixCategories(db: SqlJsDatabase): void {
+  if (getSetting(db, "sku_prefix_categories_v1", "") === "1") return;
+  const rules = [
+    { prefix: "110", category: "Cell Phones" },
+    { prefix: "92", category: "Laptops" },
+  ];
+  for (const rule of rules) {
+    db.run(`UPDATE products SET category = ? WHERE sku LIKE ?`, [
+      rule.category,
+      `${rule.prefix}%`,
+    ]);
+  }
+  saveSetting(db, "sku_prefix_categories_v1", "1");
 }
 
 function rowsToObjects(result: { columns: string[]; values: SqlValue[][] }[]): Record<string, SqlValue>[] {
@@ -144,6 +187,7 @@ function mapProduct(row: Record<string, SqlValue>): Product {
     price: asNumber(row.price),
     qty: asNumber(row.qty),
     category: asString(row.category),
+    import_date: asString(row.import_date),
     created_at: asString(row.created_at),
   };
 }
@@ -152,10 +196,34 @@ export function searchProducts(db: SqlJsDatabase, query = ""): Product[] {
   const like = `%${query}%`;
   const stmt = db.prepare(`
     SELECT * FROM products
-    WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ?
-    ORDER BY name
+    WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ? OR category LIKE ?
+    ORDER BY category, name
   `);
-  stmt.bind([like, like, like]);
+  stmt.bind([like, like, like, like]);
+  const products: Product[] = [];
+  while (stmt.step()) {
+    products.push(mapProduct(stmt.getAsObject()));
+  }
+  stmt.free();
+  return products;
+}
+
+export function listAllProducts(db: SqlJsDatabase): Product[] {
+  const stmt = db.prepare(`SELECT * FROM products ORDER BY category, name, sku`);
+  const products: Product[] = [];
+  while (stmt.step()) {
+    products.push(mapProduct(stmt.getAsObject()));
+  }
+  stmt.free();
+  return products;
+}
+
+export function listInStockProducts(db: SqlJsDatabase): Product[] {
+  const stmt = db.prepare(`
+    SELECT * FROM products
+    WHERE qty > 0
+    ORDER BY category, name, sku
+  `);
   const products: Product[] = [];
   while (stmt.step()) {
     products.push(mapProduct(stmt.getAsObject()));
@@ -166,8 +234,8 @@ export function searchProducts(db: SqlJsDatabase, query = ""): Product[] {
 
 export function addProduct(db: SqlJsDatabase, product: Product): number {
   db.run(
-    `INSERT INTO products (name, serial_number, sku, price, qty, category)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (name, serial_number, sku, price, qty, category, import_date)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       product.name,
       product.serial_number,
@@ -175,6 +243,7 @@ export function addProduct(db: SqlJsDatabase, product: Product): number {
       product.price,
       product.qty,
       product.category,
+      product.import_date || "",
     ],
   );
   const rows = rowsToObjects(db.exec("SELECT last_insert_rowid() AS id"));
@@ -184,7 +253,7 @@ export function addProduct(db: SqlJsDatabase, product: Product): number {
 export function updateProduct(db: SqlJsDatabase, product: Product): void {
   db.run(
     `UPDATE products
-     SET name=?, serial_number=?, sku=?, price=?, qty=?, category=?
+     SET name=?, serial_number=?, sku=?, price=?, qty=?, category=?, import_date=?
      WHERE id=?`,
     [
       product.name,
@@ -193,6 +262,7 @@ export function updateProduct(db: SqlJsDatabase, product: Product): void {
       product.price,
       product.qty,
       product.category,
+      product.import_date || "",
       product.id,
     ],
   );
@@ -215,6 +285,17 @@ export function upsertProductBySku(db: SqlJsDatabase, product: Product): void {
   } else {
     addProduct(db, product);
   }
+}
+
+/** Force-set category for all SKUs matching a prefix (e.g. 92 → Laptops). */
+export function updateCategoryBySkuPrefix(
+  db: SqlJsDatabase,
+  prefix: string,
+  category: string,
+): number {
+  db.run(`UPDATE products SET category = ? WHERE sku LIKE ?`, [category, `${prefix}%`]);
+  const rows = rowsToObjects(db.exec("SELECT changes() AS n"));
+  return asNumber(rows[0]?.n);
 }
 
 export function generateInvoiceNumber(db: SqlJsDatabase): string {
