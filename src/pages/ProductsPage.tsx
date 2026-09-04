@@ -2,12 +2,29 @@ import { useEffect, useState } from "react";
 import {
   addProduct,
   deleteProduct,
+  getAllSettings,
+  listAllProducts,
+  listInStockProducts,
   searchProducts,
+  updateCategoryBySkuPrefix,
   updateProduct,
   upsertProductBySku,
 } from "../db/queries";
 import { getDatabase, schedulePersist } from "../db/client";
-import { parseProductSpreadsheet } from "../lib/importProducts";
+import {
+  PRODUCT_CATEGORIES,
+  SKU_CATEGORY_RULES,
+  buildProductsExportCsv,
+  downloadTextFile,
+  filterImportableRows,
+  parseProductSpreadsheet,
+  stampImportRows,
+  todayImportDateStamp,
+} from "../lib/importProducts";
+import {
+  downloadInventoryChecklistPdf,
+  openInventoryChecklistPrint,
+} from "../lib/inventoryPdf";
 import { formatCurrency } from "../lib/money";
 import type { Product } from "../lib/types";
 import { EmptyState, SkeletonRows } from "../components/EmptyState";
@@ -22,6 +39,7 @@ const emptyProduct = (): Product => ({
   price: 0,
   qty: 0,
   category: "",
+  import_date: "",
 });
 
 export function ProductsPage() {
@@ -72,8 +90,10 @@ export function ProductsPage() {
       name: draft.name.trim(),
       sku: draft.sku.trim(),
       serial_number: draft.serial_number.trim(),
+      category: draft.category.trim(),
       price: Number(draft.price) || 0,
       qty: Number(draft.qty) || 0,
+      import_date: draft.import_date || "",
     };
     if (payload.id) {
       updateProduct(db, payload);
@@ -98,22 +118,93 @@ export function ProductsPage() {
       toast.push("No product rows found in that file", "error");
       return;
     }
+    const importable = filterImportableRows(rows);
+    const skipped = rows.length - importable.length;
+    if (!importable.length) {
+      toast.push(
+        `Nothing to import — all ${rows.length} row${rows.length === 1 ? "" : "s"} already have a Date Stamp`,
+        "error",
+      );
+      return;
+    }
+    const stamped = stampImportRows(importable, todayImportDateStamp());
     const db = getDatabase();
     let updated = 0;
     let added = 0;
-    for (const row of rows) {
-      const existing = searchProducts(db, row.sku).find((p) => p.sku && p.sku === row.sku);
+    for (const row of stamped) {
+      let category = row.category;
+      if (!category.trim()) {
+        for (const rule of SKU_CATEGORY_RULES) {
+          if (row.sku.startsWith(rule.prefix)) {
+            category = rule.category;
+            break;
+          }
+        }
+      }
+      const payload: Product = {
+        id: null,
+        name: row.name,
+        serial_number: row.serial_number,
+        sku: row.sku,
+        price: row.price,
+        qty: row.qty,
+        category,
+        import_date: row.import_date,
+      };
+      const existing =
+        row.sku &&
+        searchProducts(db, row.sku).find((p) => p.sku && p.sku === row.sku);
       if (existing && row.sku) {
-        upsertProductBySku(db, row);
+        upsertProductBySku(db, payload);
         updated += 1;
       } else {
-        addProduct(db, row);
+        addProduct(db, payload);
         added += 1;
       }
     }
     schedulePersist();
     refresh();
-    toast.push(`Imported ${added} new, updated ${updated}`, "success");
+    const skipNote = skipped ? ` · skipped ${skipped} with date` : "";
+    toast.push(`Imported ${added} new, updated ${updated}${skipNote}`, "success");
+  }
+
+  function onExportCsv() {
+    const db = getDatabase();
+    const all = listAllProducts(db);
+    const csv = buildProductsExportCsv(all);
+    const stamp = todayImportDateStamp();
+    downloadTextFile(`inventory-export-${stamp}.csv`, csv);
+    toast.push(`Exported ${all.length} products`, "success");
+  }
+
+  function onChecklistPdf(print: boolean) {
+    const db = getDatabase();
+    const inStock = listInStockProducts(db);
+    const settings = getAllSettings(db);
+    if (!inStock.length) {
+      toast.push("No in-stock products to print", "error");
+      return;
+    }
+    if (print) openInventoryChecklistPrint(inStock, settings);
+    else downloadInventoryChecklistPdf(inStock, settings);
+    toast.push(
+      print ? "Print dialog opened" : `Checklist PDF · ${inStock.length} in stock`,
+      "success",
+    );
+  }
+
+  function reapplySkuCategories() {
+    const db = getDatabase();
+    let total = 0;
+    for (const rule of SKU_CATEGORY_RULES) {
+      total += updateCategoryBySkuPrefix(db, rule.prefix, rule.category);
+    }
+    schedulePersist();
+    refresh();
+    toast.push(
+      `Updated categories · 92→Laptops, 110→Cell Phones (${total} rows touched)`,
+      "success",
+    );
   }
 
   return (
@@ -122,17 +213,23 @@ export function ProductsPage() {
         <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight">Products</h2>
           <p className="text-sm text-[var(--text-secondary)]">
-            Stock list · import a spreadsheet when you need a batch
+            Stock list · CSV import stamps today&apos;s date · blank Date Stamp only
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={openCreate}>
             Add product
           </Button>
-          <label className="focus-ring inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-base font-semibold transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]"
-            style={{ background: "var(--surface)", borderColor: "var(--border-strong)", color: "var(--text)" }}
+          <Button onClick={onExportCsv}>Export CSV</Button>
+          <label
+            className="focus-ring inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-base font-semibold transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]"
+            style={{
+              background: "var(--surface)",
+              borderColor: "var(--border-strong)",
+              color: "var(--text)",
+            }}
           >
-            Import
+            Import CSV
             <input
               type="file"
               accept=".csv,.xlsx,.xls"
@@ -144,6 +241,10 @@ export function ProductsPage() {
               }}
             />
           </label>
+          <Button onClick={() => onChecklistPdf(false)}>Checklist PDF</Button>
+          <Button variant="ghost" onClick={() => onChecklistPdf(true)}>
+            Print checklist
+          </Button>
           <a
             className="focus-ring inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-[var(--accent)]"
             href="./templates/product_import_template.csv"
@@ -161,10 +262,22 @@ export function ProductsPage() {
             style={inputStyle()}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name, SKU, or details"
+            placeholder="Name, SKU, details, or category"
           />
         </Field>
       </div>
+
+      <p className="mt-2 text-xs text-[var(--text-secondary)]">
+        Import only updates rows with an empty Date Stamp, then writes today&apos;s date.
+        SKU prefixes 92* → Laptops, 110* → Cell Phones.{" "}
+        <button
+          type="button"
+          className="focus-ring font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
+          onClick={reapplySkuCategories}
+        >
+          Re-apply SKU categories
+        </button>
+      </p>
 
       {lowStock.length > 0 ? (
         <p
@@ -190,14 +303,19 @@ export function ProductsPage() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[860px] text-left text-sm">
               <thead>
-                <tr className="border-b text-[var(--text-secondary)]" style={{ borderColor: "var(--border)" }}>
+                <tr
+                  className="border-b text-[var(--text-secondary)]"
+                  style={{ borderColor: "var(--border)" }}
+                >
                   <th className="py-2 font-medium">SKU</th>
                   <th className="py-2 font-medium">Name</th>
+                  <th className="py-2 font-medium">Category</th>
                   <th className="py-2 font-medium">Details</th>
                   <th className="py-2 font-medium text-right">Qty</th>
                   <th className="py-2 font-medium text-right">Price</th>
+                  <th className="py-2 font-medium">Date</th>
                   <th className="py-2 font-medium" />
                 </tr>
               </thead>
@@ -206,11 +324,19 @@ export function ProductsPage() {
                   <tr key={p.id} className="border-b" style={{ borderColor: "var(--border)" }}>
                     <td className="py-3 tabular">{p.sku || "—"}</td>
                     <td className="py-3 font-medium">{p.name}</td>
-                    <td className="py-3 text-[var(--text-secondary)]">{p.serial_number || "—"}</td>
-                    <td className={`py-3 text-right tabular ${p.qty <= 5 ? "text-[var(--warning)]" : ""}`}>
+                    <td className="py-3 text-[var(--text-secondary)]">{p.category || "—"}</td>
+                    <td className="py-3 text-[var(--text-secondary)]">
+                      {p.serial_number || "—"}
+                    </td>
+                    <td
+                      className={`py-3 text-right tabular ${p.qty <= 5 ? "text-[var(--warning)]" : ""}`}
+                    >
                       {p.qty}
                     </td>
                     <td className="py-3 text-right tabular">{formatCurrency(p.price)}</td>
+                    <td className="py-3 tabular text-[var(--text-secondary)]">
+                      {p.import_date || "—"}
+                    </td>
                     <td className="py-3 text-right">
                       <button
                         type="button"
@@ -267,6 +393,21 @@ export function ProductsPage() {
               />
             </Field>
           </div>
+          <Field label="Category">
+            <select
+              className={inputClass}
+              style={inputStyle()}
+              value={draft.category}
+              onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+            >
+              <option value="">Select category</option>
+              {PRODUCT_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Name">
             <input
               className={inputClass}
@@ -296,11 +437,7 @@ export function ProductsPage() {
         </div>
       </Dialog>
 
-      <Dialog
-        open={deleteId !== null}
-        title="Delete product"
-        onClose={() => setDeleteId(null)}
-      >
+      <Dialog open={deleteId !== null} title="Delete product" onClose={() => setDeleteId(null)}>
         <p className="text-sm text-[var(--text-secondary)]">
           This removes the product from inventory. Past invoices keep their line items.
         </p>
