@@ -4,10 +4,11 @@ Download `RetailInvoice-1.6.2-Windows.exe`, double-click, and go.
 
 ### What’s new
 
-- **Category pulldown** on Add/Edit product — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
-- **Batch SKU categories** — SKUs starting with `92` → Laptops; starting with `110` → Cell Phones
-- **Apply SKU categories** button on Products to re-run the batch
-- Still includes **Export checklist PDF** (in-stock only) from 1.6.1
+- **Export CSV / Import CSV** on Products — columns: SKU, Product Name, Details, Qty, Price, Category, Date Stamp
+- Import only updates rows with a **blank Date Stamp**, then writes today’s date
+- **Category pulldown** — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
+- **Batch SKU categories** — `92*` → Laptops; `110*` → Cell Phones (**Apply SKU categories** to re-run)
+- **Export checklist PDF** — in-stock only, sorted by category
 
 ### Hotkeys
 

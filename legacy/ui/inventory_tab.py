@@ -6,6 +6,7 @@ from database import (
     update_product,
     delete_product,
     search_products,
+    list_all_products,
     reapply_sku_prefix_categories,
 )
 from models import Product
@@ -16,6 +17,8 @@ from product_import import (
     import_products_from_file,
     write_csv_template,
     write_excel_template,
+    write_products_csv,
+    today_date_stamp,
 )
 from utils import format_currency
 from . import theme as T
@@ -54,30 +57,37 @@ class InventoryTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             inner,
-            text="Import spreadsheet",
+            text="Export CSV",
+            command=self.export_products_csv,
+            **T.button_kwargs(width=120),
+        ).pack(side="left", padx=(10, 0))
+
+        ctk.CTkButton(
+            inner,
+            text="Import CSV",
             command=self.import_products,
-            **T.button_kwargs(width=170),
+            **T.button_kwargs(width=120),
         ).pack(side="left", padx=(10, 0))
 
         ctk.CTkButton(
             inner,
             text="Download template",
             command=self.download_import_template,
-            **T.button_kwargs(width=170),
+            **T.button_kwargs(width=150),
         ).pack(side="left", padx=(10, 0))
 
         ctk.CTkButton(
             inner,
             text="Export checklist PDF",
             command=self.export_checklist_pdf,
-            **T.button_kwargs(width=180),
+            **T.button_kwargs(width=170),
         ).pack(side="left", padx=(10, 0))
 
         ctk.CTkButton(
             inner,
             text="Apply SKU categories",
             command=self.apply_sku_categories,
-            **T.button_kwargs(width=170),
+            **T.button_kwargs(width=160),
         ).pack(side="left", padx=(10, 0))
 
         T.field_label(inner, "Search products").pack(side="left", padx=(24, 8))
@@ -88,6 +98,29 @@ class InventoryTab(ctk.CTkFrame):
         )
         self.search_entry.pack(side="left")
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_products())
+
+    def export_products_csv(self):
+        """Export full inventory to CSV (SKU, name, details, qty, price, category, date stamp)."""
+        products = list_all_products()
+        stamp = today_date_stamp()
+        path = filedialog.asksaveasfilename(
+            parent=self.winfo_toplevel(),
+            title="Export inventory CSV",
+            defaultextension=".csv",
+            initialfile=f"inventory-export-{stamp}.csv",
+            filetypes=[("CSV", "*.csv"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            dest = Path(path)
+            if dest.suffix.lower() != ".csv":
+                dest = dest.with_suffix(".csv")
+            write_products_csv(dest, products)
+            toast(self, f"Exported {len(products)} products", kind="success")
+            self.winfo_toplevel().set_status(f"CSV exported to {dest.name}")
+        except Exception as e:
+            messagebox.showerror("Could not export CSV", str(e), parent=self.winfo_toplevel())
 
     def download_import_template(self):
         """Let the user save the Excel (or CSV) template with headings filled in."""
@@ -176,11 +209,11 @@ class InventoryTab(ctk.CTkFrame):
     def import_products(self):
         path = filedialog.askopenfilename(
             parent=self.winfo_toplevel(),
-            title="Import products from spreadsheet",
+            title="Import products from CSV / Excel",
             filetypes=[
-                ("Spreadsheets", "*.xlsx *.xlsm *.csv"),
+                ("Spreadsheets", "*.csv *.xlsx *.xlsm"),
+                ("CSV", "*.csv"),
                 ("Excel", "*.xlsx *.xlsm"),
-                ("CSV (Google Sheets)", "*.csv"),
                 ("All files", "*.*"),
             ],
         )
@@ -188,7 +221,7 @@ class InventoryTab(ctk.CTkFrame):
             return
         result = import_products_from_file(path)
         self.load_products()
-        if result.errors and not result.ok_count:
+        if result.errors and not result.ok_count and not result.skipped_dated:
             messagebox.showerror(
                 "Import failed",
                 "\n".join(result.errors[:8]),
@@ -201,9 +234,13 @@ class InventoryTab(ctk.CTkFrame):
             parts.append(f"{result.added} added")
         if result.updated:
             parts.append(f"{result.updated} updated")
-        if result.skipped:
+        if result.skipped_dated:
+            parts.append(f"{result.skipped_dated} skipped (already dated)")
+        elif result.skipped:
             parts.append(f"{result.skipped} skipped")
         summary = ", ".join(parts) if parts else "Nothing imported"
+        if result.ok_count:
+            summary += f" · stamped {today_date_stamp()}"
         toast(self, summary, kind="success" if result.ok_count else "warning", title="Import complete")
         self.winfo_toplevel().set_status(f"Import complete — {summary}")
         if result.errors:
@@ -231,8 +268,8 @@ class InventoryTab(ctk.CTkFrame):
         self.table_frame = ctk.CTkScrollableFrame(card, fg_color=T.SURFACE, corner_radius=0)
         self.table_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
 
-        self.headers = ["Code", "Product name", "Category", "Details", "In stock", "Price", ""]
-        self.widths = [90, 220, 110, 130, 80, 90, 150]
+        self.headers = ["Code", "Product name", "Category", "Details", "In stock", "Price", "Date", ""]
+        self.widths = [80, 200, 100, 110, 70, 80, 90, 140]
 
         header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.SURFACE_ALT, corner_radius=0)
         header_frame.pack(fill="x", padx=12, pady=(12, 4))
@@ -286,10 +323,11 @@ class InventoryTab(ctk.CTkFrame):
                 (p.serial_number or "—", self.widths[3]),
                 (qty_text, self.widths[4]),
                 (format_currency(p.price), self.widths[5]),
+                (getattr(p, "import_date", "") or "—", self.widths[6]),
             ]:
                 ctk.CTkLabel(row, text=text, width=width, anchor="w", font=T.FONT, text_color=color).pack(side="left", padx=6, pady=10)
 
-            actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[6])
+            actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[7])
             actions.pack(side="left", padx=6)
             ctk.CTkButton(actions, text="Edit", width=70, command=lambda prod=p: self.show_product_dialog(prod), **T.button_kwargs(height=T.BTN_HEIGHT_SM)).pack(side="left", padx=3)
             ctk.CTkButton(actions, text="Delete", width=76, command=lambda prod=p: self.delete_product(prod), **T.button_kwargs(height=T.BTN_HEIGHT_SM, text_color=T.DANGER)).pack(side="left", padx=3)

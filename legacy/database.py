@@ -17,6 +17,7 @@ def init_db():
                 price REAL NOT NULL,
                 qty INTEGER NOT NULL,
                 category TEXT,
+                import_date TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -84,6 +85,7 @@ def _migrate_schema(conn):
         "ALTER TABLE invoices ADD COLUMN discount_amount REAL DEFAULT 0",
         "ALTER TABLE invoices ADD COLUMN discount_timing TEXT DEFAULT 'before_tax'",
         "ALTER TABLE invoices ADD COLUMN customer_email TEXT DEFAULT ''",
+        "ALTER TABLE products ADD COLUMN import_date TEXT DEFAULT ''",
     ):
         try:
             cursor.execute(sql)
@@ -182,13 +184,36 @@ def get_all_settings():
     return merged
 
 # Product CRUD
+def _product_from_row(row) -> Product:
+    d = dict(row)
+    return Product(
+        id=d.get("id"),
+        name=d.get("name") or "",
+        serial_number=d.get("serial_number") or "",
+        sku=d.get("sku") or "",
+        price=float(d.get("price") or 0),
+        qty=int(d.get("qty") or 0),
+        category=d.get("category") or "",
+        created_at=d.get("created_at") or "",
+        import_date=d.get("import_date") or "",
+    )
+
+
 def add_product(product: Product):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO products (name, serial_number, sku, price, qty, category)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (product.name, product.serial_number, product.sku, product.price, product.qty, product.category))
+            INSERT INTO products (name, serial_number, sku, price, qty, category, import_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            product.name,
+            product.serial_number,
+            product.sku,
+            product.price,
+            product.qty,
+            product.category,
+            getattr(product, "import_date", "") or "",
+        ))
         conn.commit()
         return cursor.lastrowid
 
@@ -197,9 +222,18 @@ def update_product(product: Product):
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE products 
-            SET name=?, serial_number=?, sku=?, price=?, qty=?, category=?
+            SET name=?, serial_number=?, sku=?, price=?, qty=?, category=?, import_date=?
             WHERE id=?
-        ''', (product.name, product.serial_number, product.sku, product.price, product.qty, product.category, product.id))
+        ''', (
+            product.name,
+            product.serial_number,
+            product.sku,
+            product.price,
+            product.qty,
+            product.category,
+            getattr(product, "import_date", "") or "",
+            product.id,
+        ))
         conn.commit()
 
 def delete_product(product_id: int):
@@ -218,7 +252,14 @@ def search_products(query=""):
             ORDER BY category, name
         ''', (search_query, search_query, search_query, search_query))
         rows = cursor.fetchall()
-        return [Product(**dict(row)) for row in rows]
+        return [_product_from_row(row) for row in rows]
+
+
+def list_all_products() -> list[Product]:
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM products ORDER BY category, name, sku")
+        return [_product_from_row(row) for row in cursor.fetchall()]
 
 # Invoice CRUD
 INVOICE_NUMBER_PREFIX = "INV-786"

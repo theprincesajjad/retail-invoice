@@ -6,9 +6,12 @@ All notable changes to Retail Invoice are documented here.
 
 ### Products
 
+- **Export CSV / Import CSV** — full inventory round-trip with Category + Date Stamp
+- Import **only blank Date Stamp** rows, then stamps today’s date
 - **Category pulldown** — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
 - **SKU batch categories** — `92*` → Laptops, `110*` → Cell Phones (on first open; **Apply SKU categories** to re-run)
-- Category column on the Products list; search includes category
+- Category + Date columns on the Products list
+- **Export checklist PDF** (in-stock only) from 1.6.1
 
 ---
 
