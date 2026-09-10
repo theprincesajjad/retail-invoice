@@ -2,6 +2,14 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.1] — 2026-09-10
+
+### Products
+
+- **Export checklist PDF** — printable inventory list of **in-stock only** items (`qty > 0`), sorted by category, with checkboxes for floor counts
+
+---
+
 ## [1.6.0] — 2026-07-15
 
 ### Products

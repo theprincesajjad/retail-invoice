@@ -1,15 +1,17 @@
-## Retail Invoice 1.6.0
+## Retail Invoice 1.6.1
 
-Download `RetailInvoice-1.6.0-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.1-Windows.exe`, double-click, and go.
 
 ### What’s new
 
-- **Batch product import** — On Products, download an Excel/CSV template (SKU, Product Name, Details, Qty, Price), fill it in (or use Google Sheets), then Import
-- **Discount before or after tax** on New Sale (default in Setup)
-- **Scrollable totals / notes** rail for 125% Windows display scaling
-- Uniform **Save Next (F5)** / **Save Close (F6)** on Add Product
-- After **F12**: **F7 Cash** / **F8 Card**, then **F12** to confirm
-- Blank line between items on printed receipts
+- **Export checklist PDF** on Products — in-stock items only (`qty > 0`), sorted by category, with checkboxes for store floor counts
+
+### Also in 1.6.0
+
+- Batch product import (Excel / CSV template)
+- Discount before or after tax on New Sale
+- Scrollable totals rail for 125% Windows scaling
+- Save Next (F5) / Save Close (F6) on Add Product
 
 ### Hotkeys
 

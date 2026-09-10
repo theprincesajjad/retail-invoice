@@ -10,7 +10,9 @@ permissions:
   contents: write
 
 jobs:
+  # Tauri 2.x desktop builds (Windows + Mac)
   publish:
+    if: startsWith(github.ref, 'refs/tags/v2')
     strategy:
       fail-fast: false
       matrix:
@@ -56,9 +58,65 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+  # Classic Python CustomTkinter Windows exe (1.x)
   legacy-python-windows:
-    if: false
+    if: startsWith(github.ref, 'refs/tags/v1')
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: legacy
+
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Legacy Python build retained under legacy/"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run unit tests
+        run: python -m pytest tests -q
+
+      - name: Build Windows exe
+        shell: cmd
+        run: >
+          pyinstaller --name "RetailInvoice" --onefile --windowed --noconfirm --clean
+          --add-data "assets;assets"
+          --add-data "VERSION;."
+          --add-data "CHANGELOG.md;."
+          --collect-all customtkinter
+          --hidden-import customtkinter
+          --hidden-import pywin32
+          --hidden-import PIL
+          --hidden-import escpos
+          --hidden-import win32print
+          --hidden-import win32api
+          --hidden-import reportlab
+          --hidden-import reportlab.pdfgen.canvas
+          --hidden-import openpyxl
+          --hidden-import inventory_pdf
+          main.py
+
+      - name: Rename artifact
+        shell: pwsh
+        run: |
+          $ver = (Get-Content VERSION -Raw).Trim()
+          New-Item -ItemType Directory -Force -Path dist-upload | Out-Null
+          Copy-Item "dist\RetailInvoice.exe" "dist-upload\RetailInvoice-$ver-Windows.exe"
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Retail Invoice ${{ github.ref_name }}
+          body_path: legacy/RELEASE_NOTES.md
+          draft: false
+          files: legacy/dist-upload/RetailInvoice-*-Windows.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
