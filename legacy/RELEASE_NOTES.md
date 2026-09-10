@@ -1,17 +1,13 @@
-## Retail Invoice 1.6.1
+## Retail Invoice 1.6.2
 
-Download `RetailInvoice-1.6.1-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.2-Windows.exe`, double-click, and go.
 
 ### What’s new
 
-- **Export checklist PDF** on Products — in-stock items only (`qty > 0`), sorted by category, with checkboxes for store floor counts
-
-### Also in 1.6.0
-
-- Batch product import (Excel / CSV template)
-- Discount before or after tax on New Sale
-- Scrollable totals rail for 125% Windows scaling
-- Save Next (F5) / Save Close (F6) on Add Product
+- **Category pulldown** on Add/Edit product — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
+- **Batch SKU categories** — SKUs starting with `92` → Laptops; starting with `110` → Cell Phones
+- **Apply SKU categories** button on Products to re-run the batch
+- Still includes **Export checklist PDF** (in-stock only) from 1.6.1
 
 ### Hotkeys
 

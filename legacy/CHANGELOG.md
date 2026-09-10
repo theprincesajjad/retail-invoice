@@ -2,6 +2,16 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.2] — 2026-09-10
+
+### Products
+
+- **Category pulldown** — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
+- **SKU batch categories** — `92*` → Laptops, `110*` → Cell Phones (on first open; **Apply SKU categories** to re-run)
+- Category column on the Products list; search includes category
+
+---
+
 ## [1.6.1] — 2026-09-10
 
 ### Products

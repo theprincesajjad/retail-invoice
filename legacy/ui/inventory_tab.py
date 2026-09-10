@@ -1,8 +1,15 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from pathlib import Path
-from database import add_product, update_product, delete_product, search_products
+from database import (
+    add_product,
+    update_product,
+    delete_product,
+    search_products,
+    reapply_sku_prefix_categories,
+)
 from models import Product
+from product_categories import PRODUCT_CATEGORIES, category_for_sku
 from product_import import (
     TEMPLATE_HEADERS,
     ensure_templates,
@@ -66,11 +73,18 @@ class InventoryTab(ctk.CTkFrame):
             **T.button_kwargs(width=180),
         ).pack(side="left", padx=(10, 0))
 
+        ctk.CTkButton(
+            inner,
+            text="Apply SKU categories",
+            command=self.apply_sku_categories,
+            **T.button_kwargs(width=170),
+        ).pack(side="left", padx=(10, 0))
+
         T.field_label(inner, "Search products").pack(side="left", padx=(24, 8))
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
             inner, textvariable=self.search_var,
-            placeholder_text="Name, code, or details…", **T.entry_kwargs(300),
+            placeholder_text="Name, code, category, or details…", **T.entry_kwargs(280),
         )
         self.search_entry.pack(side="left")
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_products())
@@ -148,6 +162,17 @@ class InventoryTab(ctk.CTkFrame):
                 parent=self.winfo_toplevel(),
             )
 
+    def apply_sku_categories(self):
+        """Batch: SKU 92* → Laptops, SKU 110* → Cell Phones."""
+        n = reapply_sku_prefix_categories()
+        self.load_products()
+        toast(
+            self,
+            f"Updated categories · 92→Laptops, 110→Cell Phones ({n} rows)",
+            kind="success",
+        )
+        self.winfo_toplevel().set_status("SKU category rules applied")
+
     def import_products(self):
         path = filedialog.askopenfilename(
             parent=self.winfo_toplevel(),
@@ -206,8 +231,8 @@ class InventoryTab(ctk.CTkFrame):
         self.table_frame = ctk.CTkScrollableFrame(card, fg_color=T.SURFACE, corner_radius=0)
         self.table_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
 
-        self.headers = ["Code", "Product name", "Details", "In stock", "Price", ""]
-        self.widths = [100, 260, 140, 80, 100, 160]
+        self.headers = ["Code", "Product name", "Category", "Details", "In stock", "Price", ""]
+        self.widths = [90, 220, 110, 130, 80, 90, 150]
 
         header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.SURFACE_ALT, corner_radius=0)
         header_frame.pack(fill="x", padx=12, pady=(12, 4))
@@ -257,13 +282,14 @@ class InventoryTab(ctk.CTkFrame):
             for text, width in [
                 (p.sku or "—", self.widths[0]),
                 (p.name, self.widths[1]),
-                (p.serial_number or "—", self.widths[2]),
-                (qty_text, self.widths[3]),
-                (format_currency(p.price), self.widths[4]),
+                (p.category or "—", self.widths[2]),
+                (p.serial_number or "—", self.widths[3]),
+                (qty_text, self.widths[4]),
+                (format_currency(p.price), self.widths[5]),
             ]:
                 ctk.CTkLabel(row, text=text, width=width, anchor="w", font=T.FONT, text_color=color).pack(side="left", padx=6, pady=10)
 
-            actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[5])
+            actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[6])
             actions.pack(side="left", padx=6)
             ctk.CTkButton(actions, text="Edit", width=70, command=lambda prod=p: self.show_product_dialog(prod), **T.button_kwargs(height=T.BTN_HEIGHT_SM)).pack(side="left", padx=3)
             ctk.CTkButton(actions, text="Delete", width=76, command=lambda prod=p: self.delete_product(prod), **T.button_kwargs(height=T.BTN_HEIGHT_SM, text_color=T.DANGER)).pack(side="left", padx=3)
@@ -299,7 +325,7 @@ class InventoryTab(ctk.CTkFrame):
         self._product_dialog = dialog
         dialog.title("Add product" if is_new else "Edit product")
 
-        width, height = 520, 360
+        width, height = 520, 430
         dialog.configure(fg_color=T.BG)
         dialog.resizable(False, False)
         dialog.geometry(f"{width}x{height}")
@@ -339,31 +365,47 @@ class InventoryTab(ctk.CTkFrame):
         qty_entry = ctk.CTkEntry(body, placeholder_text="1", **T.entry_kwargs(width=70))
         qty_entry.grid(row=1, column=2, sticky="w", pady=(4, 14))
 
-        # Full-width name + details
-        ctk.CTkLabel(body, text="PRODUCT NAME", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+        ctk.CTkLabel(body, text="CATEGORY", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=2, column=0, columnspan=3, sticky="w"
         )
+        category_var = ctk.StringVar(value="")
+        category_menu = ctk.CTkOptionMenu(
+            body,
+            variable=category_var,
+            values=["Select category", *PRODUCT_CATEGORIES],
+            **T.combo_kwargs(width=280),
+        )
+        category_menu.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 14))
+
+        # Full-width name + details
+        ctk.CTkLabel(body, text="PRODUCT NAME", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
+            row=4, column=0, columnspan=3, sticky="w"
+        )
         name_entry = ctk.CTkEntry(body, placeholder_text="What is this product called?", **T.entry_kwargs())
-        name_entry.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(4, 14))
+        name_entry.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(4, 14))
 
         ctk.CTkLabel(body, text="DETAILS", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=4, column=0, columnspan=3, sticky="w"
+            row=6, column=0, columnspan=3, sticky="w"
         )
         details_entry = ctk.CTkEntry(
             body, placeholder_text="Specs, S/N, or other text for the invoice", **T.entry_kwargs(),
         )
-        details_entry.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(4, 8))
-
-        entries = {
-            "sku": sku_entry,
-            "price": price_entry,
-            "qty": qty_entry,
-            "name": name_entry,
-            "serial_number": details_entry,
-        }
+        details_entry.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(4, 8))
 
         footer = ctk.CTkFrame(card, fg_color="transparent")
         footer.pack(fill="x", padx=20, pady=(4, 18))
+
+        def sync_category_from_sku(_event=None):
+            suggested = category_for_sku(sku_entry.get())
+            if suggested and (
+                not category_var.get()
+                or category_var.get() == "Select category"
+                or (is_new and category_var.get() in ("", "Select category"))
+            ):
+                category_var.set(suggested)
+
+        sku_entry.bind("<KeyRelease>", sync_category_from_sku)
+        sku_entry.bind("<FocusOut>", sync_category_from_sku)
 
         if product:
             sku_entry.insert(0, product.sku or "")
@@ -371,9 +413,18 @@ class InventoryTab(ctk.CTkFrame):
             details_entry.insert(0, product.serial_number or "")
             price_entry.insert(0, str(product.price))
             qty_entry.insert(0, str(product.qty))
+            if product.category and product.category in PRODUCT_CATEGORIES:
+                category_var.set(product.category)
+            elif product.category:
+                category_var.set(product.category)
+                category_menu.configure(values=["Select category", product.category, *PRODUCT_CATEGORIES])
+            else:
+                suggested = category_for_sku(product.sku or "")
+                category_var.set(suggested or "Select category")
         else:
             qty_entry.insert(0, "1")
             price_entry.insert(0, "0.00")
+            category_var.set("Select category")
 
         def save(add_another=False):
             try:
@@ -384,15 +435,21 @@ class InventoryTab(ctk.CTkFrame):
                 qty = int(qty_entry.get().strip() or "0")
                 if qty < 0:
                     raise ValueError("Stock quantity cannot be negative")
+                sku = sku_entry.get().strip()
+                category = category_var.get().strip()
+                if category == "Select category":
+                    category = ""
+                if not category:
+                    category = category_for_sku(sku)
 
                 new_product = Product(
                     id=product.id if product else None,
                     name=name,
                     serial_number=details_entry.get().strip(),
-                    sku=sku_entry.get().strip(),
+                    sku=sku,
                     price=price,
                     qty=qty,
-                    category="",
+                    category=category,
                     created_at="",
                 )
 

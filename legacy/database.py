@@ -73,6 +73,7 @@ def init_db():
         
         conn.commit()
         _migrate_schema(conn)
+        apply_sku_prefix_categories(conn)
 
 
 def _migrate_schema(conn):
@@ -89,6 +90,70 @@ def _migrate_schema(conn):
             conn.commit()
         except sqlite3.OperationalError:
             pass
+
+
+def apply_sku_prefix_categories(conn=None) -> int:
+    """
+    Batch: SKU 92* → Laptops, SKU 110* → Cell Phones.
+    Runs once per database (settings flag). Returns rows updated.
+    """
+    from product_categories import SKU_CATEGORY_RULES
+
+    owns_conn = conn is None
+    if owns_conn:
+        from config import get_db_connection
+        ctx = get_db_connection()
+        conn = ctx.__enter__()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = ?", ("sku_prefix_categories_v1",))
+        row = cursor.fetchone()
+        if row and str(row["value"] if isinstance(row, sqlite3.Row) else row[0]) == "1":
+            return 0
+
+        total = 0
+        for prefix, category in SKU_CATEGORY_RULES:
+            cursor.execute(
+                "UPDATE products SET category = ? WHERE sku LIKE ?",
+                (category, f"{prefix}%"),
+            )
+            total += cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        cursor.execute(
+            """
+            INSERT INTO settings (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            ("sku_prefix_categories_v1", "1"),
+        )
+        conn.commit()
+        return total
+    finally:
+        if owns_conn:
+            ctx.__exit__(None, None, None)
+
+
+def update_category_by_sku_prefix(prefix: str, category: str) -> int:
+    """Force-set category for all SKUs matching prefix%."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE products SET category = ? WHERE sku LIKE ?",
+            (category, f"{prefix}%"),
+        )
+        conn.commit()
+        return cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+
+
+def reapply_sku_prefix_categories() -> int:
+    """Clear one-time flag and re-run SKU → category batch."""
+    save_setting("sku_prefix_categories_v1", "")
+    from product_categories import SKU_CATEGORY_RULES
+
+    total = 0
+    for prefix, category in SKU_CATEGORY_RULES:
+        total += update_category_by_sku_prefix(prefix, category)
+    save_setting("sku_prefix_categories_v1", "1")
+    return total
 
 def get_setting(key, default=""):
     with get_db_connection() as conn:
@@ -149,9 +214,9 @@ def search_products(query=""):
         search_query = f"%{query}%"
         cursor.execute('''
             SELECT * FROM products 
-            WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ?
-            ORDER BY name
-        ''', (search_query, search_query, search_query))
+            WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ? OR IFNULL(category,'') LIKE ?
+            ORDER BY category, name
+        ''', (search_query, search_query, search_query, search_query))
         rows = cursor.fetchall()
         return [Product(**dict(row)) for row in rows]
 
