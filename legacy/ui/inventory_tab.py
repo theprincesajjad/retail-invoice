@@ -59,6 +59,13 @@ class InventoryTab(ctk.CTkFrame):
             **T.button_kwargs(width=170),
         ).pack(side="left", padx=(10, 0))
 
+        ctk.CTkButton(
+            inner,
+            text="Export checklist PDF",
+            command=self.export_checklist_pdf,
+            **T.button_kwargs(width=180),
+        ).pack(side="left", padx=(10, 0))
+
         T.field_label(inner, "Search products").pack(side="left", padx=(24, 8))
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
@@ -97,6 +104,49 @@ class InventoryTab(ctk.CTkFrame):
             self.winfo_toplevel().set_status(f"Template saved to {dest.name}")
         except Exception as e:
             messagebox.showerror("Could not save template", str(e), parent=self.winfo_toplevel())
+
+    def export_checklist_pdf(self):
+        """Export a printable PDF of in-stock products only, sorted by category."""
+        from datetime import datetime
+        from inventory_pdf import build_inventory_checklist_pdf, in_stock_products
+
+        in_stock = in_stock_products()
+        if not in_stock:
+            messagebox.showinfo(
+                "Nothing to export",
+                "There are no in-stock products (qty greater than 0).",
+                parent=self.winfo_toplevel(),
+            )
+            return
+
+        stamp = datetime.now().strftime("%Y-%m-%d")
+        path = filedialog.asksaveasfilename(
+            parent=self.winfo_toplevel(),
+            title="Save inventory checklist PDF",
+            defaultextension=".pdf",
+            initialfile=f"inventory-checklist-{stamp}.pdf",
+            filetypes=[("PDF", "*.pdf"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            dest = Path(path)
+            if dest.suffix.lower() != ".pdf":
+                dest = dest.with_suffix(".pdf")
+            pdf_bytes = build_inventory_checklist_pdf(in_stock)
+            dest.write_bytes(pdf_bytes)
+            toast(
+                self,
+                f"Checklist saved · {len(in_stock)} in-stock products",
+                kind="success",
+            )
+            self.winfo_toplevel().set_status(f"Checklist PDF saved to {dest.name}")
+        except Exception as e:
+            messagebox.showerror(
+                "Could not export checklist",
+                str(e),
+                parent=self.winfo_toplevel(),
+            )
 
     def import_products(self):
         path = filedialog.askopenfilename(
