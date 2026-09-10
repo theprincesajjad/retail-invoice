@@ -363,7 +363,7 @@ class InventoryTab(ctk.CTkFrame):
         self._product_dialog = dialog
         dialog.title("Add product" if is_new else "Edit product")
 
-        width, height = 520, 430
+        width, height = 520, 420
         dialog.configure(fg_color=T.BG)
         dialog.resizable(False, False)
         dialog.geometry(f"{width}x{height}")
@@ -375,7 +375,7 @@ class InventoryTab(ctk.CTkFrame):
         def close_dialog():
             dialog.destroy()
 
-        dialog.bind("<Destroy>", lambda e: setattr(self, "_product_dialog", None))
+        dialog.bind("<Destroy>", lambda e: setattr(self, "_product_dialog", None) if e.widget == dialog else None)
 
         card = ctk.CTkFrame(dialog, **T.card_kwargs())
         card.pack(fill="both", expand=True, padx=18, pady=18)
@@ -386,7 +386,7 @@ class InventoryTab(ctk.CTkFrame):
         body.grid_columnconfigure(1, weight=0)
         body.grid_columnconfigure(2, weight=0)
 
-        # Top row: PRODUCT SKU | PRICE | QTY (compact)
+        # Top row: PRODUCT SKU | PRICE | QTY (same as 1.6.0)
         ctk.CTkLabel(body, text="PRODUCT SKU", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=0, column=0, sticky="w", padx=(0, 10)
         )
@@ -403,19 +403,29 @@ class InventoryTab(ctk.CTkFrame):
         qty_entry = ctk.CTkEntry(body, placeholder_text="1", **T.entry_kwargs(width=70))
         qty_entry.grid(row=1, column=2, sticky="w", pady=(4, 14))
 
+        # Category only — added on top of the 1.6.0 dialog
         ctk.CTkLabel(body, text="CATEGORY", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=2, column=0, columnspan=3, sticky="w"
         )
-        category_var = ctk.StringVar(value="")
+        category_var = ctk.StringVar(value="Select category")
         category_menu = ctk.CTkOptionMenu(
             body,
             variable=category_var,
             values=["Select category", *PRODUCT_CATEGORIES],
-            **T.combo_kwargs(width=280),
+            width=280,
+            height=T.BTN_HEIGHT,
+            font=T.FONT,
+            fg_color=T.SURFACE_GLASS if hasattr(T, "SURFACE_GLASS") else T.SURFACE,
+            button_color=T.BORDER,
+            button_hover_color=T.TEXT_TERTIARY,
+            dropdown_fg_color=T.SURFACE,
+            dropdown_hover_color=T.ACCENT_SOFT if hasattr(T, "ACCENT_SOFT") else T.SURFACE_ALT,
+            dropdown_text_color=T.TEXT,
+            text_color=T.TEXT,
         )
         category_menu.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 14))
 
-        # Full-width name + details
+        # Full-width name + details (same as 1.6.0)
         ctk.CTkLabel(body, text="PRODUCT NAME", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=4, column=0, columnspan=3, sticky="w"
         )
@@ -435,14 +445,9 @@ class InventoryTab(ctk.CTkFrame):
 
         def sync_category_from_sku(_event=None):
             suggested = category_for_sku(sku_entry.get())
-            if suggested and (
-                not category_var.get()
-                or category_var.get() == "Select category"
-                or (is_new and category_var.get() in ("", "Select category"))
-            ):
+            if suggested and category_var.get() in ("", "Select category"):
                 category_var.set(suggested)
 
-        sku_entry.bind("<KeyRelease>", sync_category_from_sku)
         sku_entry.bind("<FocusOut>", sync_category_from_sku)
 
         if product:
@@ -451,14 +456,12 @@ class InventoryTab(ctk.CTkFrame):
             details_entry.insert(0, product.serial_number or "")
             price_entry.insert(0, str(product.price))
             qty_entry.insert(0, str(product.qty))
-            if product.category and product.category in PRODUCT_CATEGORIES:
+            if product.category:
+                if product.category not in PRODUCT_CATEGORIES:
+                    category_menu.configure(values=["Select category", product.category, *PRODUCT_CATEGORIES])
                 category_var.set(product.category)
-            elif product.category:
-                category_var.set(product.category)
-                category_menu.configure(values=["Select category", product.category, *PRODUCT_CATEGORIES])
             else:
-                suggested = category_for_sku(product.sku or "")
-                category_var.set(suggested or "Select category")
+                category_var.set(category_for_sku(product.sku or "") or "Select category")
         else:
             qty_entry.insert(0, "1")
             price_entry.insert(0, "0.00")
@@ -528,7 +531,6 @@ class InventoryTab(ctk.CTkFrame):
 
         actions = ctk.CTkFrame(footer, fg_color="transparent")
         actions.pack(side="left")
-        # Uniform Save Next / Save Close — same size and weight
         btn_style = T.success_button_kwargs(width=170, height=T.BTN_HEIGHT_LG)
         if is_new:
             ctk.CTkButton(

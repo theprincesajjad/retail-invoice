@@ -2,6 +2,15 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.3] — 2026-09-10
+
+### Fixes
+
+- **Add product** dialog restored from 1.6.0 layout (only Category pulldown added) — save/close work again
+- **New sale** clears name / phone / email and focuses the custom item field
+
+---
+
 ## [1.6.2] — 2026-09-10
 
 ### Products

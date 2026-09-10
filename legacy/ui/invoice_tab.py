@@ -597,7 +597,7 @@ class InvoiceTab(ctk.CTkFrame):
                 )
 
             self.winfo_toplevel().set_status(msg)
-            self.clear_form(keep_customer=True)
+            self.clear_form(keep_customer=False)
             app = self.winfo_toplevel()
             if hasattr(app, "inventory_tab"):
                 app.inventory_tab.load_products()
@@ -626,4 +626,5 @@ class InvoiceTab(ctk.CTkFrame):
         self.search_results.set("SKU — Name — Details — Qty")
         self.current_search_products = []
         self.refresh_items()
-        self.focus_customer()
+        # Start typing at custom item (not customer name)
+        self.after(10, self.focus_manual_desc)

@@ -1,18 +1,17 @@
-## Retail Invoice 1.6.2
+## Retail Invoice 1.6.3
 
-Download `RetailInvoice-1.6.2-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.3-Windows.exe`, double-click, and go.
 
-### What’s new
+### Fixes
 
-- **Export CSV / Import CSV** on Products — columns: SKU, Product Name, Details, Qty, Price, Category, Date Stamp
-- Import only updates rows with a **blank Date Stamp**, then writes today’s date
-- **Category pulldown** — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
-- **Batch SKU categories** — `92*` → Laptops; `110*` → Cell Phones (**Apply SKU categories** to re-run)
-- **Export checklist PDF** — in-stock only, sorted by category
+- **Add product** works again — same dialog as 1.6.0, plus Category pulldown only
+- **New sale** clears customer name / phone / email and focuses the custom item box
 
-### Hotkeys
+### Still in 1.6.2
 
-F1 New · F2 Products · F3 Sales · F4 Setup · F5/F6 product save · F10 Save · F11 Preview · F12 Complete + Print · F7/F8 payment · F12 confirm
+- Export / Import CSV (Date Stamp rules)
+- Categories + SKU batch (92 → Laptops, 110 → Cell Phones)
+- In-stock checklist PDF
 
 ### Requirements
 
