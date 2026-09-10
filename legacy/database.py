@@ -300,22 +300,89 @@ def save_invoice(invoice: Invoice, items: list[InvoiceItem]):
             invoice.discount_type or "", invoice.discount_value or 0.0, invoice.discount_amount or 0.0,
             getattr(invoice, "discount_timing", None) or "before_tax",
         ))
-        
+
         invoice_id = cursor.lastrowid
-        
-        # Save invoice items and update inventory
-        for item in items:
-            cursor.execute('''
-                INSERT INTO invoice_items (invoice_id, product_id, description, serial_number, qty, unit_price, line_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (invoice_id, item.product_id, item.description, item.serial_number, item.qty, item.unit_price, item.line_total))
-            
-            # Deduct from inventory if product_id is not null
-            if item.product_id:
-                cursor.execute('UPDATE products SET qty = qty - ? WHERE id = ?', (item.qty, item.product_id))
-                
+        _insert_invoice_items(cursor, invoice_id, items, adjust_stock=True)
         conn.commit()
+        invoice.id = invoice_id
         return invoice_id
+
+
+def _insert_invoice_items(cursor, invoice_id: int, items: list[InvoiceItem], *, adjust_stock: bool):
+    for item in items:
+        cursor.execute('''
+            INSERT INTO invoice_items (invoice_id, product_id, description, serial_number, qty, unit_price, line_total)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            invoice_id, item.product_id, item.description, item.serial_number,
+            item.qty, item.unit_price, item.line_total,
+        ))
+        if adjust_stock and item.product_id:
+            cursor.execute(
+                "UPDATE products SET qty = qty - ? WHERE id = ?",
+                (item.qty, item.product_id),
+            )
+
+
+def get_invoice_by_id(invoice_id: int) -> Invoice | None:
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        data.setdefault("discount_type", "")
+        data.setdefault("discount_value", 0.0)
+        data.setdefault("discount_amount", 0.0)
+        data.setdefault("discount_timing", "before_tax")
+        data.setdefault("customer_email", "")
+        fields = Invoice.__dataclass_fields__
+        payload = {k: data[k] for k in data if k in fields and k != "items"}
+        inv = Invoice(**payload, items=[])
+        cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice_id,))
+        item_fields = InvoiceItem.__dataclass_fields__
+        inv.items = []
+        for i in cursor.fetchall():
+            idata = dict(i)
+            inv.items.append(InvoiceItem(**{k: idata[k] for k in idata if k in item_fields}))
+        return inv
+
+
+def update_invoice(invoice: Invoice, items: list[InvoiceItem]) -> None:
+    """Replace an existing invoice's header + lines; restock old lines then deduct new ones."""
+    if not invoice.id:
+        raise ValueError("Cannot update an invoice without an id")
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice.id,))
+        old_items = cursor.fetchall()
+        for old in old_items:
+            pid = old["product_id"]
+            if pid:
+                cursor.execute(
+                    "UPDATE products SET qty = qty + ? WHERE id = ?",
+                    (old["qty"], pid),
+                )
+        cursor.execute("DELETE FROM invoice_items WHERE invoice_id = ?", (invoice.id,))
+        cursor.execute('''
+            UPDATE invoices SET
+                customer_name=?, customer_phone=?, customer_email=?,
+                subtotal=?, tax_rate=?, tax_amount=?, total=?,
+                payment_method=?, notes=?,
+                discount_type=?, discount_value=?, discount_amount=?, discount_timing=?
+            WHERE id=?
+        ''', (
+            invoice.customer_name, invoice.customer_phone,
+            getattr(invoice, "customer_email", "") or "",
+            invoice.subtotal, invoice.tax_rate, invoice.tax_amount, invoice.total,
+            invoice.payment_method, invoice.notes,
+            invoice.discount_type or "", invoice.discount_value or 0.0, invoice.discount_amount or 0.0,
+            getattr(invoice, "discount_timing", None) or "before_tax",
+            invoice.id,
+        ))
+        _insert_invoice_items(cursor, invoice.id, items, adjust_stock=True)
+        conn.commit()
 
 def get_invoices(start_date=None, end_date=None, search_query=""):
     return _fetch_invoices(start_date, end_date, search_query)

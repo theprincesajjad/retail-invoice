@@ -2,6 +2,24 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.4] — 2026-09-10
+
+### Sales
+
+- **F11 Save & Close** — saves the sale without printing (Preview stays as a button, no F11)
+- **Edit** from Sales History — reopen a sale on New Sale to add/remove items, adjust prices, then Save & Close or Complete + Print (stock restocked/re-deducted)
+- **Editable line price** on items already in the sale
+
+### Reports
+
+- **Export PDF** on Sales History — accounting sales report for the selected period
+
+### Products
+
+- Import Excel/CSV template assets include **Category** + **Date Stamp** columns
+
+---
+
 ## [1.6.3] — 2026-09-10
 
 ### Fixes

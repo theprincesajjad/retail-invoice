@@ -1,9 +1,10 @@
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from database import search_invoices
 from utils import format_currency
 from datetime import datetime, timedelta
 import calendar
+from pathlib import Path
 from . import theme as T
 from .receipt_viewer import show_receipt_viewer
 from .toast import toast
@@ -15,6 +16,7 @@ class ReportsTab(ctk.CTkFrame):
 
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        self._current_invoices = []
 
         self.create_filters()
         self.create_summary()
@@ -54,13 +56,16 @@ class ReportsTab(ctk.CTkFrame):
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
             inner, textvariable=self.search_var,
-            placeholder_text="Customer name, phone, or product…", **T.entry_kwargs(260),
+            placeholder_text="Customer name, phone, or product…", **T.entry_kwargs(220),
         )
         self.search_entry.pack(side="left", padx=(0, 10))
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_invoices())
 
         ctk.CTkButton(
-            inner, text="Refresh", command=self.load_invoices, **T.button_kwargs(width=110),
+            inner, text="Refresh", command=self.load_invoices, **T.button_kwargs(width=100),
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            inner, text="Export PDF", command=self.export_report_pdf, **T.primary_button_kwargs(width=120),
         ).pack(side="left")
 
     def _show_today(self):
@@ -103,7 +108,7 @@ class ReportsTab(ctk.CTkFrame):
         self.table_frame.grid(row=0, column=0, sticky="nsew")
 
         self.headers = ["Receipt #", "Date", "Customer", "Phone", "Total", "Payment", ""]
-        self.widths = [120, 130, 150, 120, 100, 80, 240]
+        self.widths = [110, 120, 130, 100, 90, 70, 300]
 
         header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.SURFACE_ALT, corner_radius=0)
         header_frame.pack(fill="x", padx=12, pady=(12, 4))
@@ -182,6 +187,13 @@ class ReportsTab(ctk.CTkFrame):
             pass
         return start_date, end_date
 
+    def _period_label(self) -> str:
+        period = self.period_var.get()
+        rng = self.range_var.get()
+        if period == "Today":
+            return "Today"
+        return f"{period}: {rng}" if rng else period
+
     def load_invoices(self, *args):
         for widget in self.rows_frame.winfo_children():
             widget.destroy()
@@ -189,6 +201,7 @@ class ReportsTab(ctk.CTkFrame):
         start_date, end_date = self.get_date_range()
         query = self.search_var.get().strip()
         invoices = search_invoices(query, start_date, end_date)
+        self._current_invoices = invoices
 
         total_sales = sum(inv.total for inv in invoices)
         total_tax = sum(inv.tax_amount for inv in invoices)
@@ -229,17 +242,65 @@ class ReportsTab(ctk.CTkFrame):
             actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[-1])
             actions.pack(side="left", padx=4)
             ctk.CTkButton(
-                actions, text="View", width=64, command=lambda inv_obj=inv: self.view_invoice(inv_obj),
+                actions, text="Edit", width=58, command=lambda inv_obj=inv: self.edit_invoice(inv_obj),
+                **T.primary_button_kwargs(height=T.BTN_HEIGHT_SM),
+            ).pack(side="left", padx=3)
+            ctk.CTkButton(
+                actions, text="View", width=58, command=lambda inv_obj=inv: self.view_invoice(inv_obj),
                 **T.button_kwargs(height=T.BTN_HEIGHT_SM),
             ).pack(side="left", padx=3)
             ctk.CTkButton(
-                actions, text="Print", width=64, command=lambda inv_obj=inv: self.reprint_invoice(inv_obj),
+                actions, text="Print", width=58, command=lambda inv_obj=inv: self.reprint_invoice(inv_obj),
                 **T.button_kwargs(height=T.BTN_HEIGHT_SM),
             ).pack(side="left", padx=3)
             ctk.CTkButton(
-                actions, text="Email", width=64, command=lambda inv_obj=inv: self.email_invoice(inv_obj),
+                actions, text="Email", width=58, command=lambda inv_obj=inv: self.email_invoice(inv_obj),
                 **T.button_kwargs(height=T.BTN_HEIGHT_SM),
             ).pack(side="left", padx=3)
+
+    def edit_invoice(self, invoice):
+        app = self.winfo_toplevel()
+        if not hasattr(app, "invoice_tab"):
+            return
+        from database import get_invoice_by_id
+        fresh = get_invoice_by_id(invoice.id) if invoice.id else invoice
+        if not fresh:
+            toast(self, "Could not load that sale.", kind="error")
+            return
+        app.tabview.set("New Sale")
+        if hasattr(app, "_on_tab_change"):
+            app._on_tab_change()
+        app.invoice_tab.load_invoice_for_edit(fresh)
+
+    def export_report_pdf(self):
+        invoices = list(self._current_invoices)
+        start_date, end_date = self.get_date_range()
+        period = self._period_label()
+        stamp = datetime.now().strftime("%Y%m%d")
+        default_name = f"sales-report-{stamp}.pdf"
+        path = filedialog.asksaveasfilename(
+            parent=self.winfo_toplevel(),
+            title="Save sales report PDF",
+            defaultextension=".pdf",
+            filetypes=[("PDF files", "*.pdf")],
+            initialfile=default_name,
+        )
+        if not path:
+            return
+        try:
+            from sales_report_pdf import build_sales_report_pdf
+            pdf_bytes = build_sales_report_pdf(
+                invoices,
+                period_label=period,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            Path(path).write_bytes(pdf_bytes)
+            self.winfo_toplevel().set_status(f"Saved report — {Path(path).name}")
+            toast(self, f"Saved {Path(path).name}", kind="success", title="Sales report PDF")
+        except Exception as e:
+            toast(self, str(e), kind="error", title="PDF export failed")
+            messagebox.showerror("PDF export failed", str(e))
 
     def view_invoice(self, invoice):
         show_receipt_viewer(self.winfo_toplevel(), invoice, invoice.items)
@@ -257,7 +318,6 @@ class ReportsTab(ctk.CTkFrame):
     def email_invoice(self, invoice):
         from email_service import send_receipt_email
 
-        default = ""
         dialog = ctk.CTkInputDialog(
             text=f"Send receipt for {invoice.invoice_number} to:",
             title="Email receipt",

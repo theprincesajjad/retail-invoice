@@ -23,9 +23,9 @@ _TAB_KEYS = {
 }
 
 SHORTCUT_HELP = {
-    TAB_HOME: "F1 New  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print  ·  F7/F8 pay  ·  F12 confirm",
+    TAB_HOME: "F1 New  ·  F10 Save  ·  F11 Save & Close  ·  F12 Complete + Print  ·  F7/F8 pay  ·  F12 confirm",
     TAB_INVENTORY: "Alt+N add  ·  Export/Import CSV  ·  Checklist PDF  ·  F5/F6 save  ·  F1–F4 tabs",
-    TAB_REPORTS: "Alt+S search  ·  Alt+R refresh  ·  F1–F4 tabs",
+    TAB_REPORTS: "Alt+S search  ·  Alt+R refresh  ·  PDF report  ·  F1–F4 tabs",
     TAB_SETTINGS: "Store details, printer, and receipt design",
 }
 
@@ -196,7 +196,7 @@ class App(ctk.CTk):
         self.bind("<F3>", lambda e: self._goto(TAB_REPORTS))
         self.bind("<F4>", lambda e: self._goto(TAB_SETTINGS))
         self.bind("<F10>", lambda e: self._on_invoice(lambda: self.invoice_tab.save(print_rcpt=False)))
-        self.bind("<F11>", lambda e: self._on_invoice(self.invoice_tab.preview_receipt))
+        self.bind("<F11>", lambda e: self._on_invoice(lambda: self.invoice_tab.save(print_rcpt=False)))
         self.bind("<F12>", lambda e: self._on_invoice(lambda: self.invoice_tab.save(print_rcpt=True)))
 
         self.bind("<Alt-c>", lambda e: self._on_invoice(self.invoice_tab.focus_customer))

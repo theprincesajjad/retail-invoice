@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from tkinter import messagebox
-from database import search_products, generate_invoice_number, save_invoice, get_setting
+from database import (
+    search_products, generate_invoice_number, save_invoice, update_invoice, get_setting,
+)
 from models import Invoice, InvoiceItem
 from printer import print_receipt
 from utils import format_currency, compute_invoice_totals
@@ -17,6 +19,9 @@ class InvoiceTab(ctk.CTkFrame):
         super().__init__(master, fg_color=T.BG, corner_radius=0)
 
         self.items = []
+        self.editing_invoice_id = None
+        self.editing_invoice_number = None
+        self.editing_created_at = None
         self.tax_rate = float(get_setting("tax_rate", "0.13"))
         self.discount_type = ctk.StringVar(value="percent")
         self.payment_var = ctk.StringVar(value="Cash")
@@ -224,19 +229,29 @@ class InvoiceTab(ctk.CTkFrame):
     def _build_action_dock(self):
         dock = ctk.CTkFrame(self, **T.raised_card_kwargs())
         dock.grid(row=3, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 2))
+        self._action_dock = dock
+
+        self.edit_banner = ctk.CTkLabel(
+            dock, text="", font=T.FONT_MEDIUM, text_color=T.WARNING, anchor="w",
+        )
 
         inner = ctk.CTkFrame(dock, fg_color="transparent")
         inner.pack(fill="x", padx=14, pady=(12, 4))
+        self._action_inner = inner
 
         ctk.CTkButton(
             inner, text="COMPLETE  ·  F12", command=lambda: self.save(print_rcpt=True),
             **T.success_button_kwargs(width=180),
         ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            inner, text="PREVIEW  ·  F11", command=self.preview_receipt, **T.button_kwargs(width=140),
+            inner, text="SAVE & CLOSE  ·  F11", command=lambda: self.save(print_rcpt=False),
+            **T.button_kwargs(width=170),
         ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
             inner, text="SAVE  ·  F10", command=lambda: self.save(print_rcpt=False), **T.button_kwargs(width=120),
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            inner, text="PREVIEW", command=self.preview_receipt, **T.button_kwargs(width=110),
         ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
             inner, text="NEW  ·  F1", command=self.clear_form, **T.button_kwargs(width=110),
@@ -244,10 +259,11 @@ class InvoiceTab(ctk.CTkFrame):
 
         legend = ctk.CTkLabel(
             dock,
-            text="F1 New  ·  F2 Products  ·  F3 Sales  ·  F4 Setup  ·  F10 Save  ·  F11 Preview  ·  F12 Complete + Print  ·  then F7 Cash / F8 Card / F12 Confirm",
+            text="F1 New  ·  F2 Products  ·  F3 Sales  ·  F4 Setup  ·  F10 Save  ·  F11 Save & Close  ·  F12 Complete + Print  ·  then F7 Cash / F8 Card / F12 Confirm",
             font=T.FONT_CAPTION, text_color=T.TEXT_TERTIARY, anchor="w",
         )
         legend.pack(fill="x", padx=14, pady=(0, 10))
+        self._action_legend = legend
 
     def _tax_caption(self):
         return f"HST ({int(self.tax_rate * 100)}%)"
@@ -431,10 +447,76 @@ class InvoiceTab(ctk.CTkFrame):
                 item.line_total = new_qty * item.unit_price
                 self.refresh_items()
 
+    def _on_price_edit(self, index: int, entry):
+        if not (0 <= index < len(self.items)):
+            return
+        raw = entry.get().strip().replace("$", "").replace(",", "")
+        try:
+            price = float(raw)
+            if price < 0:
+                raise ValueError
+        except ValueError:
+            toast(self, "Enter a valid price.", kind="warning")
+            entry.delete(0, "end")
+            entry.insert(0, f"{self.items[index].unit_price:.2f}")
+            return
+        item = self.items[index]
+        if abs(item.unit_price - price) < 0.0001:
+            return
+        item.unit_price = price
+        item.line_total = item.qty * price
+        self.refresh_items()
+
     def remove_item(self, index):
         if 0 <= index < len(self.items):
             self.items.pop(index)
             self.refresh_items()
+
+    def load_invoice_for_edit(self, invoice: Invoice):
+        """Load an existing sale into New Sale for add/remove items, then save/print."""
+        self.clear_form(keep_customer=False)
+        self.editing_invoice_id = invoice.id
+        self.editing_invoice_number = invoice.invoice_number
+        self.editing_created_at = invoice.created_at
+        self.customer_name_entry.insert(0, invoice.customer_name or "")
+        self.customer_phone_entry.insert(0, invoice.customer_phone or "")
+        self.customer_email_entry.insert(0, getattr(invoice, "customer_email", "") or "")
+        self.notes_entry.insert(0, invoice.notes or "")
+        self.payment_var.set(invoice.payment_method or "Cash")
+        dtype = invoice.discount_type or "percent"
+        self.discount_type.set(dtype if dtype in ("percent", "fixed") else "percent")
+        if hasattr(self, "discount_timing"):
+            self.discount_timing.set(getattr(invoice, "discount_timing", None) or "before_tax")
+        if invoice.discount_type == "fixed" and invoice.discount_value:
+            self.discount_amt_entry.insert(0, f"{invoice.discount_value:g}")
+        elif invoice.discount_type == "percent" and invoice.discount_value:
+            self.discount_pct_entry.insert(0, f"{invoice.discount_value:g}")
+        self.items = [
+            InvoiceItem(
+                id=None,
+                invoice_id=None,
+                product_id=it.product_id,
+                description=it.description,
+                serial_number=it.serial_number or "",
+                qty=it.qty,
+                unit_price=it.unit_price,
+                line_total=it.line_total,
+            )
+            for it in (invoice.items or [])
+        ]
+        self._show_edit_banner(True)
+        self.refresh_items()
+        toast(self, f"Editing {invoice.invoice_number} — add or remove items, then Save or Complete", kind="info")
+
+    def _show_edit_banner(self, editing: bool):
+        if not hasattr(self, "edit_banner"):
+            return
+        self.edit_banner.pack_forget()
+        if editing and self.editing_invoice_number:
+            self.edit_banner.configure(
+                text=f"Editing {self.editing_invoice_number} — change items, then Save & Close (F11) or Complete + Print (F12)"
+            )
+            self.edit_banner.pack(fill="x", padx=14, pady=(10, 0), before=self._action_inner)
 
     def refresh_items(self):
         for w in self.item_rows_frame.winfo_children():
@@ -472,7 +554,13 @@ class InvoiceTab(ctk.CTkFrame):
                 ctk.CTkLabel(qty_frame, text=str(item.qty), width=28, font=T.FONT_MEDIUM, text_color=T.TEXT).pack(side="left")
                 ctk.CTkButton(qty_frame, text="+", width=36, command=lambda idx=i: self.change_qty(idx, 1), **T.button_kwargs(height=32)).pack(side="left")
 
-                ctk.CTkLabel(row, text=format_currency(item.unit_price), width=80, anchor="w", font=T.FONT, text_color=T.TEXT).pack(side="left", padx=4)
+                price_entry = ctk.CTkEntry(row, **T.entry_kwargs(88, height=32))
+                price_entry.insert(0, f"{item.unit_price:.2f}")
+                price_entry.pack(side="left", padx=4)
+                price_entry.bind("<FocusOut>", lambda e, idx=i, ent=price_entry: self._on_price_edit(idx, ent))
+                price_entry.bind("<Return>", lambda e, idx=i, ent=price_entry: (self._on_price_edit(idx, ent), "break")[1])
+                price_entry.bind("<KP_Enter>", lambda e, idx=i, ent=price_entry: (self._on_price_edit(idx, ent), "break")[1])
+
                 ctk.CTkLabel(row, text=format_currency(item.line_total), width=90, anchor="w", font=T.FONT_MEDIUM, text_color=T.TEXT).pack(side="left", padx=4)
 
                 ctk.CTkButton(
@@ -512,9 +600,18 @@ class InvoiceTab(ctk.CTkFrame):
             self.items, self.tax_rate, dtype, dval, timing,
         )
 
+        if self.editing_invoice_id:
+            number = self.editing_invoice_number or generate_invoice_number()
+            inv_id = self.editing_invoice_id
+            created = self.editing_created_at
+        else:
+            number = generate_invoice_number()
+            inv_id = None
+            created = None
+
         return Invoice(
-            id=None,
-            invoice_number=generate_invoice_number(),
+            id=inv_id,
+            invoice_number=number,
             customer_name=self.customer_name_entry.get().strip(),
             customer_phone=self.customer_phone_entry.get().strip(),
             customer_email=self.customer_email_entry.get().strip(),
@@ -524,7 +621,7 @@ class InvoiceTab(ctk.CTkFrame):
             total=total,
             payment_method=self.payment_var.get(),
             notes=self.notes_entry.get().strip(),
-            created_at=None,
+            created_at=created,
             items=[],
             discount_type=dtype if dval > 0 else "",
             discount_value=dval,
@@ -538,13 +635,15 @@ class InvoiceTab(ctk.CTkFrame):
             return
         from datetime import datetime
         invoice = self._build_invoice()
-        invoice.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        invoice.created_at = invoice.created_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         show_receipt_viewer(self.winfo_toplevel(), invoice, list(self.items), is_preview=True)
 
     def save(self, print_rcpt=True):
         if not self.items:
             toast(self, "Add at least one item before completing the sale.", kind="warning")
             return
+
+        editing = bool(self.editing_invoice_id)
 
         if print_rcpt:
             payment = ask_payment_method(
@@ -559,31 +658,41 @@ class InvoiceTab(ctk.CTkFrame):
         if print_rcpt:
             confirmed = ask_yes_no(
                 self.winfo_toplevel(),
-                "Complete sale & print?",
-                f"Total: {format_currency(invoice.total)}\nPaid by: {invoice.payment_method}\n\nThis will save the sale and print the receipt.",
-                confirm_label="Complete & print",
+                "Update sale & print?" if editing else "Complete sale & print?",
+                f"Total: {format_currency(invoice.total)}\nPaid by: {invoice.payment_method}\n\n"
+                + (
+                    "This will update the sale and print the receipt."
+                    if editing
+                    else "This will save the sale and print the receipt."
+                ),
+                confirm_label="Save & print" if editing else "Complete & print",
                 cancel_label="Not yet",
             )
         else:
             confirmed = ask_yes_no(
                 self.winfo_toplevel(),
-                "Save this sale?",
+                "Save & close this sale?" if editing else "Save this sale?",
                 f"Total: {format_currency(invoice.total)}\n\nSave without printing a receipt.",
-                confirm_label="Save sale",
+                confirm_label="Save & close",
                 cancel_label="Not yet",
             )
         if not confirmed:
             return
 
         try:
-            save_invoice(invoice, self.items)
-            msg = f"Sale saved — {invoice.invoice_number}"
+            if editing:
+                update_invoice(invoice, self.items)
+                msg = f"Sale updated — {invoice.invoice_number}"
+            else:
+                save_invoice(invoice, self.items)
+                msg = f"Sale saved — {invoice.invoice_number}"
             if print_rcpt:
                 from datetime import datetime
-                invoice.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                if not invoice.created_at:
+                    invoice.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 printed, print_msg = print_receipt(invoice, self.items)
                 if printed:
-                    msg = f"Sale complete · {invoice.invoice_number} · {format_currency(invoice.total)}"
+                    msg = f"{'Updated' if editing else 'Sale complete'} · {invoice.invoice_number} · {format_currency(invoice.total)}"
                     toast(self, msg, kind="success", title="Receipt printed")
                 else:
                     toast(self, print_msg, kind="error", title="Sale saved, but print failed")
@@ -593,7 +702,7 @@ class InvoiceTab(ctk.CTkFrame):
                     self,
                     f"{invoice.invoice_number} · {format_currency(invoice.total)}",
                     kind="success",
-                    title="Sale saved",
+                    title="Sale updated" if editing else "Sale saved",
                 )
 
             self.winfo_toplevel().set_status(msg)
@@ -608,6 +717,10 @@ class InvoiceTab(ctk.CTkFrame):
             toast(self, str(e), kind="error", title="Could not save")
 
     def clear_form(self, keep_customer=False):
+        self.editing_invoice_id = None
+        self.editing_invoice_number = None
+        self.editing_created_at = None
+        self._show_edit_banner(False)
         if not keep_customer:
             self.customer_name_entry.delete(0, "end")
             self.customer_phone_entry.delete(0, "end")
