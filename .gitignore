@@ -19,6 +19,8 @@ src-tauri/target/
 
 # Database (local user data)
 data/*.db
+legacy/data/*.db
+**/invoices.db
 
 # OS
 .DS_Store

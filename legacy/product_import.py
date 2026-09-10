@@ -1,15 +1,25 @@
-"""Batch import products from Excel (.xlsx) or CSV (Google Sheets export)."""
+"""Batch import/export products from Excel (.xlsx) or CSV."""
 
 from __future__ import annotations
 
 import csv
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
 from models import Product
+from product_categories import category_for_sku
 
-# Canonical template headings (row 1). Accept common aliases when importing.
-TEMPLATE_HEADERS = ["SKU", "Product Name", "Details", "Qty", "Price"]
+# Canonical template / export headings (row 1).
+TEMPLATE_HEADERS = [
+    "SKU",
+    "Product Name",
+    "Details",
+    "Qty",
+    "Price",
+    "Category",
+    "Date Stamp",
+]
 
 HEADER_ALIASES = {
     "sku": "SKU",
@@ -33,6 +43,15 @@ HEADER_ALIASES = {
     "price": "Price",
     "unit price": "Price",
     "cost": "Price",
+    "category": "Category",
+    "cat": "Category",
+    "type": "Category",
+    "date stamp": "Date Stamp",
+    "datestamp": "Date Stamp",
+    "import date": "Date Stamp",
+    "date": "Date Stamp",
+    "count date": "Date Stamp",
+    "counted": "Date Stamp",
 }
 
 
@@ -41,11 +60,16 @@ class ImportResult:
         self.added = 0
         self.updated = 0
         self.skipped = 0
+        self.skipped_dated = 0
         self.errors: list[str] = []
 
     @property
     def ok_count(self) -> int:
         return self.added + self.updated
+
+
+def today_date_stamp(d: datetime | None = None) -> str:
+    return (d or datetime.now()).strftime("%Y-%m-%d")
 
 
 def template_path(base: Path | None = None) -> Path:
@@ -56,7 +80,7 @@ def template_path(base: Path | None = None) -> Path:
 
 
 def write_excel_template(path: Path | str) -> Path:
-    """Write a blank Excel template with headings (and one example row)."""
+    """Write a blank Excel template with headings (and example rows)."""
     from openpyxl import Workbook
     from openpyxl.styles import Font
 
@@ -69,11 +93,11 @@ def write_excel_template(path: Path | str) -> Path:
     for col, header in enumerate(TEMPLATE_HEADERS, start=1):
         cell = ws.cell(row=1, column=col, value=header)
         cell.font = Font(bold=True)
-    # Example row so the sheet is clear how to fill it
-    ws.append(["60000", "Dell Latitude Laptop", "i5 16GB 512GB", 2, 699.99])
-    ws.append(["60001", "Laptop Case", "15.6 inch", 10, 15.00])
+    ws.append(["60000", "Dell Latitude Laptop", "i5 16GB 512GB", 2, 699.99, "Laptops", ""])
+    ws.append(["92001", "ThinkPad X1", "16GB 512GB", 1, 899.00, "Laptops", ""])
+    ws.append(["110001", "iPhone 13", "128GB Blue", 3, 499.00, "Cell Phones", ""])
 
-    widths = {"A": 14, "B": 32, "C": 36, "D": 10, "E": 12}
+    widths = {"A": 14, "B": 32, "C": 28, "D": 8, "E": 10, "F": 14, "G": 14}
     for letter, width in widths.items():
         ws.column_dimensions[letter].width = width
 
@@ -82,14 +106,15 @@ def write_excel_template(path: Path | str) -> Path:
 
 
 def write_csv_template(path: Path | str) -> Path:
-    """CSV twin of the Excel template (handy for Google Sheets → Download → CSV)."""
+    """CSV twin of the Excel template."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(TEMPLATE_HEADERS)
-        writer.writerow(["60000", "Dell Latitude Laptop", "i5 16GB 512GB", 2, 699.99])
-        writer.writerow(["60001", "Laptop Case", "15.6 inch", 10, 15.00])
+        writer.writerow(["60000", "Dell Latitude Laptop", "i5 16GB 512GB", 2, 699.99, "Laptops", ""])
+        writer.writerow(["92001", "ThinkPad X1", "16GB 512GB", 1, 899.00, "Laptops", ""])
+        writer.writerow(["110001", "iPhone 13", "128GB Blue", 3, 499.00, "Cell Phones", ""])
     return path
 
 
@@ -100,6 +125,26 @@ def ensure_templates(assets_dir: Path | None = None) -> tuple[Path, Path]:
     xlsx = write_excel_template(root / "product_import_template.xlsx")
     csv_path = write_csv_template(root / "product_import_template.csv")
     return xlsx, csv_path
+
+
+def write_products_csv(path: Path | str, products: list[Product]) -> Path:
+    """Export full inventory to CSV (includes Category + Date Stamp)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(TEMPLATE_HEADERS)
+        for p in products:
+            writer.writerow([
+                p.sku or "",
+                p.name or "",
+                p.serial_number or "",
+                p.qty,
+                p.price,
+                p.category or "",
+                getattr(p, "import_date", "") or "",
+            ])
+    return path
 
 
 def _normalize_header(raw: str) -> str | None:
@@ -177,9 +222,9 @@ def read_product_rows(path: Path | str) -> list[dict]:
         raise ValueError("Use an Excel (.xlsx) or CSV file. Google Sheets: File → Download → Excel or CSV.")
 
     mapping = _map_headers(headers)
-    if "Product Name" not in mapping:
+    if "Product Name" not in mapping and "SKU" not in mapping:
         raise ValueError(
-            "Missing required column: Product Name.\n"
+            "Missing required column: Product Name or SKU.\n"
             f"Expected headings: {', '.join(TEMPLATE_HEADERS)}"
         )
 
@@ -188,21 +233,29 @@ def read_product_rows(path: Path | str) -> list[dict]:
         if not row or all(c is None or str(c).strip() == "" for c in row):
             continue
         name = _cell(row, mapping.get("Product Name"))
-        if not name:
+        sku = _cell(row, mapping.get("SKU"))
+        if not name and not sku:
             continue
         products.append({
             "row": row_num,
-            "name": name,
-            "sku": _cell(row, mapping.get("SKU")),
+            "name": name or "Untitled product",
+            "sku": sku,
             "serial_number": _cell(row, mapping.get("Details")),
             "qty": _cell(row, mapping.get("Qty")),
             "price": _cell(row, mapping.get("Price")),
+            "category": _cell(row, mapping.get("Category")),
+            "import_date": _cell(row, mapping.get("Date Stamp")),
         })
     return products
 
 
 def import_products_from_file(path: Path | str, *, update_existing_by_sku: bool = True) -> ImportResult:
-    """Import products into the database. Matches existing rows by SKU when present."""
+    """
+    Import products into the database.
+
+    Only rows with a blank Date Stamp are imported; those rows are stamped with
+    today's date (YYYY-MM-DD). Rows that already have a date are skipped.
+    """
     from database import add_product, search_products, update_product
 
     result = ImportResult()
@@ -216,7 +269,15 @@ def import_products_from_file(path: Path | str, *, update_existing_by_sku: bool 
         result.errors.append("No product rows found. Fill in the template and try again.")
         return result
 
+    stamp = today_date_stamp()
+
     for row in rows:
+        # Import only when Date Stamp is blank
+        if (row.get("import_date") or "").strip():
+            result.skipped_dated += 1
+            result.skipped += 1
+            continue
+
         try:
             price = _parse_price(row["price"])
             qty = _parse_qty(row["qty"])
@@ -229,6 +290,10 @@ def import_products_from_file(path: Path | str, *, update_existing_by_sku: bool 
             result.errors.append(f"Row {row['row']}: {e}")
             continue
 
+        category = (row.get("category") or "").strip()
+        if not category:
+            category = category_for_sku(row["sku"])
+
         product = Product(
             id=None,
             name=row["name"],
@@ -236,13 +301,17 @@ def import_products_from_file(path: Path | str, *, update_existing_by_sku: bool 
             sku=row["sku"],
             price=price,
             qty=qty,
-            category="",
+            category=category,
             created_at="",
+            import_date=stamp,
         )
 
         existing = None
         if update_existing_by_sku and product.sku:
-            matches = [p for p in search_products(product.sku) if (p.sku or "").strip().lower() == product.sku.lower()]
+            matches = [
+                p for p in search_products(product.sku)
+                if (p.sku or "").strip().lower() == product.sku.lower()
+            ]
             if matches:
                 existing = matches[0]
 

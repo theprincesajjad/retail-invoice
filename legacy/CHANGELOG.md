@@ -2,6 +2,36 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.3] — 2026-09-10
+
+### Fixes
+
+- **Add product** dialog restored from 1.6.0 layout (only Category pulldown added) — save/close work again
+- **New sale** clears name / phone / email and focuses the custom item field
+
+---
+
+## [1.6.2] — 2026-09-10
+
+### Products
+
+- **Export CSV / Import CSV** — full inventory round-trip with Category + Date Stamp
+- Import **only blank Date Stamp** rows, then stamps today’s date
+- **Category pulldown** — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
+- **SKU batch categories** — `92*` → Laptops, `110*` → Cell Phones (on first open; **Apply SKU categories** to re-run)
+- Category + Date columns on the Products list
+- **Export checklist PDF** (in-stock only) from 1.6.1
+
+---
+
+## [1.6.1] — 2026-09-10
+
+### Products
+
+- **Export checklist PDF** — printable inventory list of **in-stock only** items (`qty > 0`), sorted by category, with checkboxes for floor counts
+
+---
+
 ## [1.6.0] — 2026-07-15
 
 ### Products

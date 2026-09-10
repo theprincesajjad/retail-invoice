@@ -12,7 +12,8 @@ class Product:
     price: float
     qty: int
     category: str
-    created_at: str
+    created_at: str = ""
+    import_date: str = ""
 
 @dataclass
 class InvoiceItem:
