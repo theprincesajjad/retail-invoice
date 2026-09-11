@@ -101,6 +101,55 @@ def test_update_invoice_restocks_and_rededucts(db):
     assert loaded.items[0].unit_price == 90.0
 
 
+def test_void_invoice_restocks_and_blocks_edit(db):
+    pid = db.add_product(
+        Product(
+            id=None,
+            name="Phone",
+            serial_number="B2",
+            sku="110001",
+            price=50.0,
+            qty=5,
+            category="Cell Phones",
+        )
+    )
+    items = [
+        InvoiceItem(
+            id=None,
+            invoice_id=None,
+            product_id=pid,
+            description="Phone",
+            serial_number="B2",
+            qty=2,
+            unit_price=50.0,
+            line_total=100.0,
+        )
+    ]
+    inv = _make_invoice(
+        invoice_number="INV-7777",
+        subtotal=100.0,
+        tax_amount=13.0,
+        total=113.0,
+    )
+    inv_id = db.save_invoice(inv, items)
+    assert db.search_products("110001")[0].qty == 3
+
+    voided = db.void_invoice(inv_id)
+    assert int(voided.voided) == 1
+    assert voided.voided_at
+    assert db.search_products("110001")[0].qty == 5
+
+    loaded = db.get_invoice_by_id(inv_id)
+    assert int(loaded.voided) == 1
+
+    with pytest.raises(ValueError, match="already voided"):
+        db.void_invoice(inv_id)
+
+    inv.id = inv_id
+    with pytest.raises(ValueError, match="voided"):
+        db.update_invoice(inv, items)
+
+
 def test_sales_report_pdf_bytes():
     inv = _make_invoice(invoice_number="INV-0099")
     inv.items = [

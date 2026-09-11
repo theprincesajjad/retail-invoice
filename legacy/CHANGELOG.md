@@ -2,6 +2,16 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.5] — 2026-09-11
+
+### Sales History
+
+- **Void** a sale — red Void button with a confirmation dialog, then type the receipt # to confirm
+- Voided sales restock inventory, stay listed as VOID, and are excluded from totals / PDF reports
+- Voided sales cannot be edited
+
+---
+
 ## [1.6.4] — 2026-09-10
 
 ### Sales

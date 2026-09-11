@@ -108,7 +108,7 @@ class ReportsTab(ctk.CTkFrame):
         self.table_frame.grid(row=0, column=0, sticky="nsew")
 
         self.headers = ["Receipt #", "Date", "Customer", "Phone", "Total", "Payment", ""]
-        self.widths = [110, 120, 130, 100, 90, 70, 300]
+        self.widths = [110, 120, 120, 95, 90, 80, 360]
 
         header_frame = ctk.CTkFrame(self.table_frame, fg_color=T.SURFACE_ALT, corner_radius=0)
         header_frame.pack(fill="x", padx=12, pady=(12, 4))
@@ -203,9 +203,10 @@ class ReportsTab(ctk.CTkFrame):
         invoices = search_invoices(query, start_date, end_date)
         self._current_invoices = invoices
 
-        total_sales = sum(inv.total for inv in invoices)
-        total_tax = sum(inv.tax_amount for inv in invoices)
-        count = len(invoices)
+        active = [inv for inv in invoices if not int(getattr(inv, "voided", 0) or 0)]
+        total_sales = sum(inv.total for inv in active)
+        total_tax = sum(inv.tax_amount for inv in active)
+        count = len(active)
         avg = total_sales / count if count else 0
 
         self.total_sales_var.set(format_currency(total_sales))
@@ -222,43 +223,56 @@ class ReportsTab(ctk.CTkFrame):
             return
 
         for i, inv in enumerate(invoices):
+            is_voided = bool(int(getattr(inv, "voided", 0) or 0))
             row = ctk.CTkFrame(
                 self.rows_frame,
-                fg_color=T.SURFACE_ALT if i % 2 == 0 else "transparent",
+                fg_color=T.DANGER_SOFT if is_voided else (T.SURFACE_ALT if i % 2 == 0 else "transparent"),
                 corner_radius=T.RADIUS_SM,
             )
             row.pack(fill="x", pady=1)
 
             date_str = inv.created_at[:16] if inv.created_at else ""
+            receipt_label = f"{inv.invoice_number}  VOID" if is_voided else inv.invoice_number
+            payment_label = "Voided" if is_voided else (inv.payment_method or "—")
             cells = [
-                inv.invoice_number, date_str, inv.customer_name or "Walk-in", inv.customer_phone or "—",
-                format_currency(inv.total), inv.payment_method,
+                receipt_label, date_str, inv.customer_name or "Walk-in", inv.customer_phone or "—",
+                format_currency(inv.total), payment_label,
             ]
+            text_color = T.DANGER if is_voided else T.TEXT
             for text, width in zip(cells, self.widths[:-1]):
-                ctk.CTkLabel(row, text=text, width=width, anchor="w", font=T.FONT, text_color=T.TEXT).pack(
+                ctk.CTkLabel(row, text=text, width=width, anchor="w", font=T.FONT, text_color=text_color).pack(
                     side="left", padx=4, pady=10
                 )
 
             actions = ctk.CTkFrame(row, fg_color="transparent", width=self.widths[-1])
             actions.pack(side="left", padx=4)
-            ctk.CTkButton(
-                actions, text="Edit", width=58, command=lambda inv_obj=inv: self.edit_invoice(inv_obj),
-                **T.primary_button_kwargs(height=T.BTN_HEIGHT_SM),
-            ).pack(side="left", padx=3)
+            if not is_voided:
+                ctk.CTkButton(
+                    actions, text="Edit", width=58, command=lambda inv_obj=inv: self.edit_invoice(inv_obj),
+                    **T.primary_button_kwargs(height=T.BTN_HEIGHT_SM),
+                ).pack(side="left", padx=3)
             ctk.CTkButton(
                 actions, text="View", width=58, command=lambda inv_obj=inv: self.view_invoice(inv_obj),
                 **T.button_kwargs(height=T.BTN_HEIGHT_SM),
             ).pack(side="left", padx=3)
-            ctk.CTkButton(
-                actions, text="Print", width=58, command=lambda inv_obj=inv: self.reprint_invoice(inv_obj),
-                **T.button_kwargs(height=T.BTN_HEIGHT_SM),
-            ).pack(side="left", padx=3)
-            ctk.CTkButton(
-                actions, text="Email", width=58, command=lambda inv_obj=inv: self.email_invoice(inv_obj),
-                **T.button_kwargs(height=T.BTN_HEIGHT_SM),
-            ).pack(side="left", padx=3)
+            if not is_voided:
+                ctk.CTkButton(
+                    actions, text="Print", width=58, command=lambda inv_obj=inv: self.reprint_invoice(inv_obj),
+                    **T.button_kwargs(height=T.BTN_HEIGHT_SM),
+                ).pack(side="left", padx=3)
+                ctk.CTkButton(
+                    actions, text="Email", width=58, command=lambda inv_obj=inv: self.email_invoice(inv_obj),
+                    **T.button_kwargs(height=T.BTN_HEIGHT_SM),
+                ).pack(side="left", padx=3)
+                ctk.CTkButton(
+                    actions, text="Void", width=58, command=lambda inv_obj=inv: self.void_invoice(inv_obj),
+                    **T.danger_button_kwargs(width=58, height=T.BTN_HEIGHT_SM),
+                ).pack(side="left", padx=3)
 
     def edit_invoice(self, invoice):
+        if int(getattr(invoice, "voided", 0) or 0):
+            toast(self, "Voided sales cannot be edited.", kind="warning")
+            return
         app = self.winfo_toplevel()
         if not hasattr(app, "invoice_tab"):
             return
@@ -267,13 +281,71 @@ class ReportsTab(ctk.CTkFrame):
         if not fresh:
             toast(self, "Could not load that sale.", kind="error")
             return
+        if int(getattr(fresh, "voided", 0) or 0):
+            toast(self, "Voided sales cannot be edited.", kind="warning")
+            self.load_invoices()
+            return
         app.tabview.set("New Sale")
         if hasattr(app, "_on_tab_change"):
             app._on_tab_change()
         app.invoice_tab.load_invoice_for_edit(fresh)
 
+    def void_invoice(self, invoice):
+        if int(getattr(invoice, "voided", 0) or 0):
+            toast(self, "This sale is already voided.", kind="info")
+            return
+        from .dialogs import ask_yes_no
+        from database import void_invoice as db_void_invoice
+
+        confirmed = ask_yes_no(
+            self.winfo_toplevel(),
+            f"Void {invoice.invoice_number}?",
+            (
+                f"Customer: {invoice.customer_name or 'Walk-in'}\n"
+                f"Total: {format_currency(invoice.total)}\n\n"
+                "This permanently voids the sale and puts inventory back in stock.\n"
+                "It will no longer count in sales totals.\n\n"
+                "This cannot be undone."
+            ),
+            confirm_label="Void this sale",
+            cancel_label="Keep sale",
+            destructive=True,
+        )
+        if not confirmed:
+            return
+
+        # Second confirmation — requires typing the receipt number
+        dialog = ctk.CTkInputDialog(
+            text=(
+                f"Type {invoice.invoice_number} to confirm voiding this sale.\n"
+                "Inventory will be restocked."
+            ),
+            title="Confirm void",
+        )
+        typed = (dialog.get_input() or "").strip()
+        if typed != invoice.invoice_number:
+            if typed:
+                toast(self, "Receipt number did not match — sale was not voided.", kind="warning")
+            return
+
+        try:
+            db_void_invoice(invoice.id)
+            self.winfo_toplevel().set_status(f"Voided {invoice.invoice_number}")
+            toast(self, f"Voided {invoice.invoice_number} — stock restored", kind="success", title="Sale voided")
+            app = self.winfo_toplevel()
+            if hasattr(app, "inventory_tab"):
+                app.inventory_tab.load_products()
+            self.load_invoices()
+        except Exception as e:
+            toast(self, str(e), kind="error", title="Could not void sale")
+            messagebox.showerror("Void failed", str(e))
+
     def export_report_pdf(self):
-        invoices = list(self._current_invoices)
+        # Accounting PDF: active (non-voided) sales only
+        invoices = [
+            inv for inv in self._current_invoices
+            if not int(getattr(inv, "voided", 0) or 0)
+        ]
         start_date, end_date = self.get_date_range()
         period = self._period_label()
         stamp = datetime.now().strftime("%Y%m%d")

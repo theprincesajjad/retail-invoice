@@ -85,6 +85,8 @@ def _migrate_schema(conn):
         "ALTER TABLE invoices ADD COLUMN discount_amount REAL DEFAULT 0",
         "ALTER TABLE invoices ADD COLUMN discount_timing TEXT DEFAULT 'before_tax'",
         "ALTER TABLE invoices ADD COLUMN customer_email TEXT DEFAULT ''",
+        "ALTER TABLE invoices ADD COLUMN voided INTEGER DEFAULT 0",
+        "ALTER TABLE invoices ADD COLUMN voided_at TEXT DEFAULT ''",
         "ALTER TABLE products ADD COLUMN import_date TEXT DEFAULT ''",
     ):
         try:
@@ -337,6 +339,8 @@ def get_invoice_by_id(invoice_id: int) -> Invoice | None:
         data.setdefault("discount_amount", 0.0)
         data.setdefault("discount_timing", "before_tax")
         data.setdefault("customer_email", "")
+        data.setdefault("voided", 0)
+        data.setdefault("voided_at", "")
         fields = Invoice.__dataclass_fields__
         payload = {k: data[k] for k in data if k in fields and k != "items"}
         inv = Invoice(**payload, items=[])
@@ -355,6 +359,12 @@ def update_invoice(invoice: Invoice, items: list[InvoiceItem]) -> None:
         raise ValueError("Cannot update an invoice without an id")
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("SELECT voided FROM invoices WHERE id = ?", (invoice.id,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError("Sale not found")
+        if int(row["voided"] or 0):
+            raise ValueError("Cannot edit a voided sale")
         cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice.id,))
         old_items = cursor.fetchall()
         for old in old_items:
@@ -383,6 +393,41 @@ def update_invoice(invoice: Invoice, items: list[InvoiceItem]) -> None:
         ))
         _insert_invoice_items(cursor, invoice.id, items, adjust_stock=True)
         conn.commit()
+
+
+def void_invoice(invoice_id: int) -> Invoice:
+    """Mark a sale voided and restock inventory. Idempotent if already voided."""
+    if not invoice_id:
+        raise ValueError("Cannot void a sale without an id")
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError("Sale not found")
+        data = dict(row)
+        if int(data.get("voided") or 0):
+            raise ValueError("This sale is already voided")
+        cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice_id,))
+        for old in cursor.fetchall():
+            pid = old["product_id"]
+            if pid:
+                cursor.execute(
+                    "UPDATE products SET qty = qty + ? WHERE id = ?",
+                    (old["qty"], pid),
+                )
+        from datetime import datetime
+        voided_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            "UPDATE invoices SET voided = 1, voided_at = ? WHERE id = ?",
+            (voided_at, invoice_id),
+        )
+        conn.commit()
+    loaded = get_invoice_by_id(invoice_id)
+    if not loaded:
+        raise ValueError("Sale not found after void")
+    return loaded
+
 
 def get_invoices(start_date=None, end_date=None, search_query=""):
     return _fetch_invoices(start_date, end_date, search_query)
@@ -419,6 +464,8 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
         cursor.execute(query, params)
         rows = cursor.fetchall()
         invoices = []
+        fields = Invoice.__dataclass_fields__
+        item_fields = InvoiceItem.__dataclass_fields__
         for row in rows:
             data = dict(row)
             data.setdefault("discount_type", "")
@@ -426,9 +473,15 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
             data.setdefault("discount_amount", 0.0)
             data.setdefault("discount_timing", "before_tax")
             data.setdefault("customer_email", "")
-            inv = Invoice(**data, items=[])
+            data.setdefault("voided", 0)
+            data.setdefault("voided_at", "")
+            payload = {k: data[k] for k in data if k in fields and k != "items"}
+            inv = Invoice(**payload, items=[])
             cursor.execute('SELECT * FROM invoice_items WHERE invoice_id = ?', (inv.id,))
             item_rows = cursor.fetchall()
-            inv.items = [InvoiceItem(**dict(i)) for i in item_rows]
+            inv.items = [
+                InvoiceItem(**{k: dict(i)[k] for k in dict(i) if k in item_fields})
+                for i in item_rows
+            ]
             invoices.append(inv)
         return invoices

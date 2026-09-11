@@ -45,3 +45,5 @@ class Invoice:
     discount_amount: float = 0.0
     discount_timing: str = "before_tax"  # "before_tax" or "after_tax"
     customer_email: str = ""
+    voided: int = 0
+    voided_at: str = ""
