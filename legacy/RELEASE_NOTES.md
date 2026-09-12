@@ -1,17 +1,19 @@
-## Retail Invoice 1.6.3
+## Retail Invoice 1.6.5
 
-Download `RetailInvoice-1.6.3-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.5-Windows.exe`, double-click, and go.
 
-### Fixes
+### New
 
-- **Add product** works again — same dialog as 1.6.0, plus Category pulldown only
-- **New sale** clears customer name / phone / email and focuses the custom item box
+- **Void** a sale from Sales History — confirmation dialog, then type the receipt # so it can’t be done by accident
+- Voided sales restock inventory, show as VOID, and are left out of totals / PDF reports
 
-### Still in 1.6.2
+### Also in 1.6.4
 
-- Export / Import CSV (Date Stamp rules)
-- Categories + SKU batch (92 → Laptops, 110 → Cell Phones)
-- In-stock checklist PDF
+- **F11 Save & Close** (no print)
+- **Edit** sale from Sales History (add/remove items, change prices)
+- Editable line price on the sale
+- Sales History **Export PDF** for accounting
+- Import templates include Category + Date Stamp
 
 ### Requirements
 
