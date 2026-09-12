@@ -708,10 +708,14 @@ class InvoiceTab(ctk.CTkFrame):
             self.winfo_toplevel().set_status(msg)
             self.clear_form(keep_customer=False)
             app = self.winfo_toplevel()
-            if hasattr(app, "inventory_tab"):
-                app.inventory_tab.load_products()
-            if hasattr(app, "reports_tab"):
-                app.reports_tab.load_invoices()
+            try:
+                if hasattr(app, "inventory_tab"):
+                    app.inventory_tab.load_products()
+                if hasattr(app, "reports_tab"):
+                    app.reports_tab.load_invoices()
+            except Exception as refresh_err:
+                # Sale already saved — don't scare the cashier with "Save failed"
+                toast(self, str(refresh_err), kind="warning", title="Sale saved — list refresh failed")
         except Exception as e:
             messagebox.showerror("Save failed", str(e))
             toast(self, str(e), kind="error", title="Could not save")

@@ -265,7 +265,7 @@ class ReportsTab(ctk.CTkFrame):
                     **T.button_kwargs(height=T.BTN_HEIGHT_SM),
                 ).pack(side="left", padx=3)
                 ctk.CTkButton(
-                    actions, text="Void", width=58, command=lambda inv_obj=inv: self.void_invoice(inv_obj),
+                    actions, text="Void", command=lambda inv_obj=inv: self.void_invoice(inv_obj),
                     **T.danger_button_kwargs(width=58, height=T.BTN_HEIGHT_SM),
                 ).pack(side="left", padx=3)
 

@@ -2,6 +2,14 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.6] — 2026-09-12
+
+### Fixes
+
+- **Save & Close (F11)** and **edit sale save** no longer crash with `CTkButton … width` after saving (Void button was passing `width` twice when Sales History refreshed)
+
+---
+
 ## [1.6.5] — 2026-09-11
 
 ### Sales History
