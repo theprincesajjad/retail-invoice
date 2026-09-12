@@ -363,12 +363,11 @@ class InventoryTab(ctk.CTkFrame):
         self._product_dialog = dialog
         dialog.title("Add product" if is_new else "Edit product")
 
-        width, height = 520, 420
+        width, height = 520, 520
         dialog.configure(fg_color=T.BG)
-        dialog.resizable(False, False)
+        dialog.resizable(False, True)
         dialog.geometry(f"{width}x{height}")
-        dialog.minsize(width, height)
-        dialog.maxsize(width, height)
+        dialog.minsize(width, 420)
         dialog.transient(parent)
         dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
 
@@ -379,33 +378,37 @@ class InventoryTab(ctk.CTkFrame):
 
         card = ctk.CTkFrame(dialog, **T.card_kwargs())
         card.pack(fill="both", expand=True, padx=18, pady=18)
+        # Use grid inside the card so the scroll area grows and buttons stay pinned
+        card.grid_rowconfigure(0, weight=1)
+        card.grid_columnconfigure(0, weight=1)
 
-        body = ctk.CTkFrame(card, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=20, pady=(18, 8))
+        # Scrollable fields — footer buttons stay pinned below so they never hide
+        body = ctk.CTkScrollableFrame(card, fg_color="transparent", corner_radius=0)
+        body.grid(row=0, column=0, sticky="nsew", padx=12, pady=(12, 4))
         body.grid_columnconfigure(0, weight=1)
         body.grid_columnconfigure(1, weight=0)
         body.grid_columnconfigure(2, weight=0)
 
         # Top row: PRODUCT SKU | PRICE | QTY (same as 1.6.0)
         ctk.CTkLabel(body, text="PRODUCT SKU", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=0, column=0, sticky="w", padx=(0, 10)
+            row=0, column=0, sticky="w", padx=(8, 10)
         )
         ctk.CTkLabel(body, text="PRICE", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
             row=0, column=1, sticky="w", padx=(0, 10)
         )
         ctk.CTkLabel(body, text="QTY", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=0, column=2, sticky="w"
+            row=0, column=2, sticky="w", padx=(0, 8)
         )
         sku_entry = ctk.CTkEntry(body, placeholder_text="e.g. 60000", **T.entry_kwargs(width=120))
-        sku_entry.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=(4, 14))
+        sku_entry.grid(row=1, column=0, sticky="w", padx=(8, 10), pady=(4, 14))
         price_entry = ctk.CTkEntry(body, placeholder_text="0.00", **T.entry_kwargs(width=90))
         price_entry.grid(row=1, column=1, sticky="w", padx=(0, 10), pady=(4, 14))
         qty_entry = ctk.CTkEntry(body, placeholder_text="1", **T.entry_kwargs(width=70))
-        qty_entry.grid(row=1, column=2, sticky="w", pady=(4, 14))
+        qty_entry.grid(row=1, column=2, sticky="w", padx=(0, 8), pady=(4, 14))
 
         # Category only — added on top of the 1.6.0 dialog
         ctk.CTkLabel(body, text="CATEGORY", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=2, column=0, columnspan=3, sticky="w"
+            row=2, column=0, columnspan=3, sticky="w", padx=8
         )
         category_var = ctk.StringVar(value="Select category")
         category_menu = ctk.CTkOptionMenu(
@@ -423,25 +426,25 @@ class InventoryTab(ctk.CTkFrame):
             dropdown_text_color=T.TEXT,
             text_color=T.TEXT,
         )
-        category_menu.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 14))
+        category_menu.grid(row=3, column=0, columnspan=3, sticky="w", padx=8, pady=(4, 14))
 
         # Full-width name + details (same as 1.6.0)
         ctk.CTkLabel(body, text="PRODUCT NAME", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=4, column=0, columnspan=3, sticky="w"
+            row=4, column=0, columnspan=3, sticky="w", padx=8
         )
         name_entry = ctk.CTkEntry(body, placeholder_text="What is this product called?", **T.entry_kwargs())
-        name_entry.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(4, 14))
+        name_entry.grid(row=5, column=0, columnspan=3, sticky="ew", padx=8, pady=(4, 14))
 
         ctk.CTkLabel(body, text="DETAILS", font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY).grid(
-            row=6, column=0, columnspan=3, sticky="w"
+            row=6, column=0, columnspan=3, sticky="w", padx=8
         )
         details_entry = ctk.CTkEntry(
             body, placeholder_text="Specs, S/N, or other text for the invoice", **T.entry_kwargs(),
         )
-        details_entry.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(4, 8))
+        details_entry.grid(row=7, column=0, columnspan=3, sticky="ew", padx=8, pady=(4, 16))
 
         footer = ctk.CTkFrame(card, fg_color="transparent")
-        footer.pack(fill="x", padx=20, pady=(4, 18))
+        footer.grid(row=1, column=0, sticky="ew", padx=20, pady=(8, 18))
 
         def sync_category_from_sku(_event=None):
             suggested = category_for_sku(sku_entry.get())

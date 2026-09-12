@@ -2,6 +2,14 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.7] — 2026-09-12
+
+### Fixes
+
+- **Add / Edit product** window: form scrolls and Save buttons stay pinned at the bottom (no more hidden F5/F6)
+
+---
+
 ## [1.6.6] — 2026-09-12
 
 ### Fixes
