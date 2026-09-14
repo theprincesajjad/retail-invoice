@@ -17,6 +17,7 @@ def init_db():
                 price REAL NOT NULL,
                 qty INTEGER NOT NULL,
                 category TEXT,
+                import_date TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -73,6 +74,7 @@ def init_db():
         
         conn.commit()
         _migrate_schema(conn)
+        apply_sku_prefix_categories(conn)
 
 
 def _migrate_schema(conn):
@@ -83,12 +85,79 @@ def _migrate_schema(conn):
         "ALTER TABLE invoices ADD COLUMN discount_amount REAL DEFAULT 0",
         "ALTER TABLE invoices ADD COLUMN discount_timing TEXT DEFAULT 'before_tax'",
         "ALTER TABLE invoices ADD COLUMN customer_email TEXT DEFAULT ''",
+        "ALTER TABLE invoices ADD COLUMN voided INTEGER DEFAULT 0",
+        "ALTER TABLE invoices ADD COLUMN voided_at TEXT DEFAULT ''",
+        "ALTER TABLE products ADD COLUMN import_date TEXT DEFAULT ''",
     ):
         try:
             cursor.execute(sql)
             conn.commit()
         except sqlite3.OperationalError:
             pass
+
+
+def apply_sku_prefix_categories(conn=None) -> int:
+    """
+    Batch: SKU 92* → Laptops, SKU 110* → Cell Phones.
+    Runs once per database (settings flag). Returns rows updated.
+    """
+    from product_categories import SKU_CATEGORY_RULES
+
+    owns_conn = conn is None
+    if owns_conn:
+        from config import get_db_connection
+        ctx = get_db_connection()
+        conn = ctx.__enter__()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = ?", ("sku_prefix_categories_v1",))
+        row = cursor.fetchone()
+        if row and str(row["value"] if isinstance(row, sqlite3.Row) else row[0]) == "1":
+            return 0
+
+        total = 0
+        for prefix, category in SKU_CATEGORY_RULES:
+            cursor.execute(
+                "UPDATE products SET category = ? WHERE sku LIKE ?",
+                (category, f"{prefix}%"),
+            )
+            total += cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        cursor.execute(
+            """
+            INSERT INTO settings (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            ("sku_prefix_categories_v1", "1"),
+        )
+        conn.commit()
+        return total
+    finally:
+        if owns_conn:
+            ctx.__exit__(None, None, None)
+
+
+def update_category_by_sku_prefix(prefix: str, category: str) -> int:
+    """Force-set category for all SKUs matching prefix%."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE products SET category = ? WHERE sku LIKE ?",
+            (category, f"{prefix}%"),
+        )
+        conn.commit()
+        return cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+
+
+def reapply_sku_prefix_categories() -> int:
+    """Clear one-time flag and re-run SKU → category batch."""
+    save_setting("sku_prefix_categories_v1", "")
+    from product_categories import SKU_CATEGORY_RULES
+
+    total = 0
+    for prefix, category in SKU_CATEGORY_RULES:
+        total += update_category_by_sku_prefix(prefix, category)
+    save_setting("sku_prefix_categories_v1", "1")
+    return total
 
 def get_setting(key, default=""):
     with get_db_connection() as conn:
@@ -117,13 +186,36 @@ def get_all_settings():
     return merged
 
 # Product CRUD
+def _product_from_row(row) -> Product:
+    d = dict(row)
+    return Product(
+        id=d.get("id"),
+        name=d.get("name") or "",
+        serial_number=d.get("serial_number") or "",
+        sku=d.get("sku") or "",
+        price=float(d.get("price") or 0),
+        qty=int(d.get("qty") or 0),
+        category=d.get("category") or "",
+        created_at=d.get("created_at") or "",
+        import_date=d.get("import_date") or "",
+    )
+
+
 def add_product(product: Product):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO products (name, serial_number, sku, price, qty, category)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (product.name, product.serial_number, product.sku, product.price, product.qty, product.category))
+            INSERT INTO products (name, serial_number, sku, price, qty, category, import_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            product.name,
+            product.serial_number,
+            product.sku,
+            product.price,
+            product.qty,
+            product.category,
+            getattr(product, "import_date", "") or "",
+        ))
         conn.commit()
         return cursor.lastrowid
 
@@ -132,9 +224,18 @@ def update_product(product: Product):
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE products 
-            SET name=?, serial_number=?, sku=?, price=?, qty=?, category=?
+            SET name=?, serial_number=?, sku=?, price=?, qty=?, category=?, import_date=?
             WHERE id=?
-        ''', (product.name, product.serial_number, product.sku, product.price, product.qty, product.category, product.id))
+        ''', (
+            product.name,
+            product.serial_number,
+            product.sku,
+            product.price,
+            product.qty,
+            product.category,
+            getattr(product, "import_date", "") or "",
+            product.id,
+        ))
         conn.commit()
 
 def delete_product(product_id: int):
@@ -149,11 +250,18 @@ def search_products(query=""):
         search_query = f"%{query}%"
         cursor.execute('''
             SELECT * FROM products 
-            WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ?
-            ORDER BY name
-        ''', (search_query, search_query, search_query))
+            WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ? OR IFNULL(category,'') LIKE ?
+            ORDER BY category, name
+        ''', (search_query, search_query, search_query, search_query))
         rows = cursor.fetchall()
-        return [Product(**dict(row)) for row in rows]
+        return [_product_from_row(row) for row in rows]
+
+
+def list_all_products() -> list[Product]:
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM products ORDER BY category, name, sku")
+        return [_product_from_row(row) for row in cursor.fetchall()]
 
 # Invoice CRUD
 INVOICE_NUMBER_PREFIX = "INV-786"
@@ -194,22 +302,132 @@ def save_invoice(invoice: Invoice, items: list[InvoiceItem]):
             invoice.discount_type or "", invoice.discount_value or 0.0, invoice.discount_amount or 0.0,
             getattr(invoice, "discount_timing", None) or "before_tax",
         ))
-        
+
         invoice_id = cursor.lastrowid
-        
-        # Save invoice items and update inventory
-        for item in items:
-            cursor.execute('''
-                INSERT INTO invoice_items (invoice_id, product_id, description, serial_number, qty, unit_price, line_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (invoice_id, item.product_id, item.description, item.serial_number, item.qty, item.unit_price, item.line_total))
-            
-            # Deduct from inventory if product_id is not null
-            if item.product_id:
-                cursor.execute('UPDATE products SET qty = qty - ? WHERE id = ?', (item.qty, item.product_id))
-                
+        _insert_invoice_items(cursor, invoice_id, items, adjust_stock=True)
         conn.commit()
+        invoice.id = invoice_id
         return invoice_id
+
+
+def _insert_invoice_items(cursor, invoice_id: int, items: list[InvoiceItem], *, adjust_stock: bool):
+    for item in items:
+        cursor.execute('''
+            INSERT INTO invoice_items (invoice_id, product_id, description, serial_number, qty, unit_price, line_total)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            invoice_id, item.product_id, item.description, item.serial_number,
+            item.qty, item.unit_price, item.line_total,
+        ))
+        if adjust_stock and item.product_id:
+            cursor.execute(
+                "UPDATE products SET qty = qty - ? WHERE id = ?",
+                (item.qty, item.product_id),
+            )
+
+
+def get_invoice_by_id(invoice_id: int) -> Invoice | None:
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        data.setdefault("discount_type", "")
+        data.setdefault("discount_value", 0.0)
+        data.setdefault("discount_amount", 0.0)
+        data.setdefault("discount_timing", "before_tax")
+        data.setdefault("customer_email", "")
+        data.setdefault("voided", 0)
+        data.setdefault("voided_at", "")
+        fields = Invoice.__dataclass_fields__
+        payload = {k: data[k] for k in data if k in fields and k != "items"}
+        inv = Invoice(**payload, items=[])
+        cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice_id,))
+        item_fields = InvoiceItem.__dataclass_fields__
+        inv.items = []
+        for i in cursor.fetchall():
+            idata = dict(i)
+            inv.items.append(InvoiceItem(**{k: idata[k] for k in idata if k in item_fields}))
+        return inv
+
+
+def update_invoice(invoice: Invoice, items: list[InvoiceItem]) -> None:
+    """Replace an existing invoice's header + lines; restock old lines then deduct new ones."""
+    if not invoice.id:
+        raise ValueError("Cannot update an invoice without an id")
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT voided FROM invoices WHERE id = ?", (invoice.id,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError("Sale not found")
+        if int(row["voided"] or 0):
+            raise ValueError("Cannot edit a voided sale")
+        cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice.id,))
+        old_items = cursor.fetchall()
+        for old in old_items:
+            pid = old["product_id"]
+            if pid:
+                cursor.execute(
+                    "UPDATE products SET qty = qty + ? WHERE id = ?",
+                    (old["qty"], pid),
+                )
+        cursor.execute("DELETE FROM invoice_items WHERE invoice_id = ?", (invoice.id,))
+        cursor.execute('''
+            UPDATE invoices SET
+                customer_name=?, customer_phone=?, customer_email=?,
+                subtotal=?, tax_rate=?, tax_amount=?, total=?,
+                payment_method=?, notes=?,
+                discount_type=?, discount_value=?, discount_amount=?, discount_timing=?
+            WHERE id=?
+        ''', (
+            invoice.customer_name, invoice.customer_phone,
+            getattr(invoice, "customer_email", "") or "",
+            invoice.subtotal, invoice.tax_rate, invoice.tax_amount, invoice.total,
+            invoice.payment_method, invoice.notes,
+            invoice.discount_type or "", invoice.discount_value or 0.0, invoice.discount_amount or 0.0,
+            getattr(invoice, "discount_timing", None) or "before_tax",
+            invoice.id,
+        ))
+        _insert_invoice_items(cursor, invoice.id, items, adjust_stock=True)
+        conn.commit()
+
+
+def void_invoice(invoice_id: int) -> Invoice:
+    """Mark a sale voided and restock inventory. Idempotent if already voided."""
+    if not invoice_id:
+        raise ValueError("Cannot void a sale without an id")
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError("Sale not found")
+        data = dict(row)
+        if int(data.get("voided") or 0):
+            raise ValueError("This sale is already voided")
+        cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice_id,))
+        for old in cursor.fetchall():
+            pid = old["product_id"]
+            if pid:
+                cursor.execute(
+                    "UPDATE products SET qty = qty + ? WHERE id = ?",
+                    (old["qty"], pid),
+                )
+        from datetime import datetime
+        voided_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            "UPDATE invoices SET voided = 1, voided_at = ? WHERE id = ?",
+            (voided_at, invoice_id),
+        )
+        conn.commit()
+    loaded = get_invoice_by_id(invoice_id)
+    if not loaded:
+        raise ValueError("Sale not found after void")
+    return loaded
+
 
 def get_invoices(start_date=None, end_date=None, search_query=""):
     return _fetch_invoices(start_date, end_date, search_query)
@@ -246,6 +464,8 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
         cursor.execute(query, params)
         rows = cursor.fetchall()
         invoices = []
+        fields = Invoice.__dataclass_fields__
+        item_fields = InvoiceItem.__dataclass_fields__
         for row in rows:
             data = dict(row)
             data.setdefault("discount_type", "")
@@ -253,9 +473,15 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
             data.setdefault("discount_amount", 0.0)
             data.setdefault("discount_timing", "before_tax")
             data.setdefault("customer_email", "")
-            inv = Invoice(**data, items=[])
+            data.setdefault("voided", 0)
+            data.setdefault("voided_at", "")
+            payload = {k: data[k] for k in data if k in fields and k != "items"}
+            inv = Invoice(**payload, items=[])
             cursor.execute('SELECT * FROM invoice_items WHERE invoice_id = ?', (inv.id,))
             item_rows = cursor.fetchall()
-            inv.items = [InvoiceItem(**dict(i)) for i in item_rows]
+            inv.items = [
+                InvoiceItem(**{k: dict(i)[k] for k in dict(i) if k in item_fields})
+                for i in item_rows
+            ]
             invoices.append(inv)
         return invoices

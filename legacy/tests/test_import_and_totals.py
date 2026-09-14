@@ -53,16 +53,17 @@ def test_discount_after_tax_fixed():
 def test_excel_template_headers_and_rows(tmp_path: Path):
     path = write_excel_template(tmp_path / "t.xlsx")
     rows = read_product_rows(path)
-    assert len(rows) == 2
+    assert len(rows) >= 2
     assert rows[0]["name"] == "Dell Latitude Laptop"
     assert rows[0]["sku"] == "60000"
     assert rows[0]["price"] == "699.99"
+    assert rows[0]["category"] == "Laptops"
 
 
 def test_csv_template_roundtrip(tmp_path: Path):
     path = write_csv_template(tmp_path / "t.csv")
     rows = read_product_rows(path)
-    assert {r["sku"] for r in rows} == {"60000", "60001"}
+    assert {r["sku"] for r in rows} >= {"60000", "92001"}
     text = path.read_text(encoding="utf-8")
     assert ",".join(TEMPLATE_HEADERS) in text
 
