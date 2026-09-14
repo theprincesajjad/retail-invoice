@@ -2,6 +2,109 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.10] — 2026-09-14
+
+### Products / Excel sync
+
+- Sync rewrites the sheet **by Category**, with **SKU low → high** inside each category
+- **Blank row gaps** between categories for adding new items in Excel
+
+---
+
+## [1.6.9] — 2026-09-14
+
+### Products
+
+- **Sync Excel** / **Choose Excel…** — two-way sync with a local inventory workbook
+- Sheet columns: SKU, Status (In-Stock / Sold), Product Description, Details, qty, Category, price, date added, date sold
+- Pull new/edited rows from Excel on Sync; rewrite Excel from current inventory
+- Sales / voids / product edits auto-update the Excel when a file is configured (Status + date sold)
+
+---
+
+## [1.6.8] — 2026-09-14
+
+### Sales History
+
+- **Custom dates** period with manual From / To fields (YYYY-MM-DD or MM/DD/YYYY)
+- **Monthly totals** PDF export — per-month invoice count, revenue, and tax, plus combined grand total (voided sales excluded)
+
+---
+
+## [1.6.7] — 2026-09-12
+
+### Fixes
+
+- **Add / Edit product** window: form scrolls and Save buttons stay pinned at the bottom (no more hidden F5/F6)
+
+---
+
+## [1.6.6] — 2026-09-12
+
+### Fixes
+
+- **Save & Close (F11)** and **edit sale save** no longer crash with `CTkButton … width` after saving (Void button was passing `width` twice when Sales History refreshed)
+
+---
+
+## [1.6.5] — 2026-09-11
+
+### Sales History
+
+- **Void** a sale — red Void button with a confirmation dialog, then type the receipt # to confirm
+- Voided sales restock inventory, stay listed as VOID, and are excluded from totals / PDF reports
+- Voided sales cannot be edited
+
+---
+
+## [1.6.4] — 2026-09-10
+
+### Sales
+
+- **F11 Save & Close** — saves the sale without printing (Preview stays as a button, no F11)
+- **Edit** from Sales History — reopen a sale on New Sale to add/remove items, adjust prices, then Save & Close or Complete + Print (stock restocked/re-deducted)
+- **Editable line price** on items already in the sale
+
+### Reports
+
+- **Export PDF** on Sales History — accounting sales report for the selected period
+
+### Products
+
+- Import Excel/CSV template assets include **Category** + **Date Stamp** columns
+
+---
+
+## [1.6.3] — 2026-09-10
+
+### Fixes
+
+- **Add product** dialog restored from 1.6.0 layout (only Category pulldown added) — save/close work again
+- **New sale** clears name / phone / email and focuses the custom item field
+
+---
+
+## [1.6.2] — 2026-09-10
+
+### Products
+
+- **Export CSV / Import CSV** — full inventory round-trip with Category + Date Stamp
+- Import **only blank Date Stamp** rows, then stamps today’s date
+- **Category pulldown** — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
+- **SKU batch categories** — `92*` → Laptops, `110*` → Cell Phones (on first open; **Apply SKU categories** to re-run)
+- Category + Date columns on the Products list
+- **Export checklist PDF** (in-stock only) from 1.6.1
+
+---
+
+## [1.6.1] — 2026-09-10
+
+### Products
+
+- **Export checklist PDF** — printable inventory list of **in-stock only** items (`qty > 0`), sorted by category, with checkboxes for floor counts
+
+---
+
 ## [1.6.0] — 2026-07-15
 
 ### Products
