@@ -7,7 +7,11 @@ import pytest
 import config
 import database
 from models import Invoice, InvoiceItem, Product
-from sales_report_pdf import build_sales_report_pdf
+from sales_report_pdf import (
+    aggregate_monthly_totals,
+    build_monthly_totals_pdf,
+    build_sales_report_pdf,
+)
 
 
 @pytest.fixture()
@@ -173,6 +177,76 @@ def test_sales_report_pdf_bytes():
     )
     assert pdf[:4] == b"%PDF"
     assert len(pdf) > 200
+
+
+def test_aggregate_monthly_totals_skips_voided_and_sums():
+    july_a = _make_invoice(
+        invoice_number="INV-0701",
+        created_at="2026-07-05 10:00:00",
+        subtotal=100.0,
+        tax_amount=13.0,
+        total=113.0,
+    )
+    july_b = _make_invoice(
+        invoice_number="INV-0702",
+        created_at="2026-07-20 11:00:00",
+        subtotal=50.0,
+        tax_amount=6.5,
+        total=56.5,
+    )
+    aug = _make_invoice(
+        invoice_number="INV-0801",
+        created_at="2026-08-01 09:00:00",
+        subtotal=200.0,
+        tax_amount=26.0,
+        total=226.0,
+    )
+    voided = _make_invoice(
+        invoice_number="INV-0802",
+        created_at="2026-08-15 09:00:00",
+        subtotal=999.0,
+        tax_amount=99.0,
+        total=1098.0,
+        voided=1,
+    )
+    rows = aggregate_monthly_totals([july_a, july_b, aug, voided])
+    assert [r["month_key"] for r in rows] == ["2026-07", "2026-08"]
+    assert rows[0]["invoices"] == 2
+    assert rows[0]["revenue"] == pytest.approx(169.5)
+    assert rows[0]["tax"] == pytest.approx(19.5)
+    assert rows[1]["invoices"] == 1
+    assert rows[1]["revenue"] == pytest.approx(226.0)
+    assert rows[1]["tax"] == pytest.approx(26.0)
+
+
+def test_monthly_totals_pdf_bytes():
+    invoices = [
+        _make_invoice(created_at="2026-06-01 12:00:00", total=10.0, tax_amount=1.0, subtotal=9.0),
+        _make_invoice(
+            invoice_number="INV-0002",
+            created_at="2026-07-15 12:00:00",
+            total=20.0,
+            tax_amount=2.0,
+            subtotal=18.0,
+        ),
+    ]
+    pdf = build_monthly_totals_pdf(
+        invoices,
+        period_label="Custom: 2026-06-01 → 2026-07-31",
+        start_date="2026-06-01 00:00:00",
+        end_date="2026-07-31 23:59:59",
+        settings={"business_name": "Test Shop"},
+    )
+    assert pdf[:4] == b"%PDF"
+    assert len(pdf) > 200
+
+
+def test_parse_user_date_formats():
+    from utils import parse_report_date
+
+    assert parse_report_date("2026-09-01") == "2026-09-01 00:00:00"
+    assert parse_report_date("09/01/2026", end_of_day=True) == "2026-09-01 23:59:59"
+    assert parse_report_date("not-a-date") is None
 
 
 def test_committed_templates_have_date_stamp():

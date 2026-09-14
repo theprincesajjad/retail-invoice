@@ -2,6 +2,15 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.8] — 2026-09-14
+
+### Sales History
+
+- **Custom dates** period with manual From / To fields (YYYY-MM-DD or MM/DD/YYYY)
+- **Monthly totals** PDF export — per-month invoice count, revenue, and tax, plus combined grand total (voided sales excluded)
+
+---
+
 ## [1.6.7] — 2026-09-12
 
 ### Fixes

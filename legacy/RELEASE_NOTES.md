@@ -1,13 +1,15 @@
-## Retail Invoice 1.6.7
+## Retail Invoice 1.6.8
 
-Download `RetailInvoice-1.6.7-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.8-Windows.exe`, double-click, and go.
 
-### Fixes
+### Sales History
 
-- **Add / Edit product** — form is scrollable; Save Next / Save Close stay visible at the bottom
+- **Custom date range** — enter From / To dates (YYYY-MM-DD or MM/DD/YYYY) and Apply dates
+- **Monthly totals** PDF — export invoice count, revenue, and tax per month, plus a combined total (no individual invoices)
 
 ### Also recent
 
+- 1.6.7: Add / Edit product scrollable form
 - 1.6.6: Save & Close (F11) / edit-sale save crash fixed
 - 1.6.5: Void sale from Sales History
 

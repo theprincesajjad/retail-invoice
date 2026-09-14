@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 from database import search_invoices
-from utils import format_currency
+from utils import format_currency, parse_report_date
 from datetime import datetime, timedelta
 import calendar
 from pathlib import Path
@@ -29,48 +29,89 @@ class ReportsTab(ctk.CTkFrame):
         card = ctk.CTkFrame(self, **T.card_kwargs())
         card.grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 8))
 
-        inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="x", padx=T.PAD_CARD, pady=14)
+        top = ctk.CTkFrame(card, fg_color="transparent")
+        top.pack(fill="x", padx=T.PAD_CARD, pady=(14, 6))
 
         ctk.CTkButton(
-            inner, text="Today", command=self._show_today, **T.primary_button_kwargs(width=100, height=T.BTN_HEIGHT),
+            top, text="Today", command=self._show_today, **T.primary_button_kwargs(width=100, height=T.BTN_HEIGHT),
         ).pack(side="left", padx=(0, 12))
 
-        T.field_label(inner, "Time period").pack(side="left", padx=(0, 8))
+        T.field_label(top, "Time period").pack(side="left", padx=(0, 8))
         self.period_var = ctk.StringVar(value="Today")
         self.period_combo = ctk.CTkComboBox(
-            inner, variable=self.period_var,
-            values=["Today", "This week", "Monthly", "Quarterly", "Yearly"],
+            top, variable=self.period_var,
+            values=["Today", "This week", "Monthly", "Quarterly", "Yearly", "Custom dates"],
             command=self.on_filter_change, **T.combo_kwargs(140),
         )
         self.period_combo.pack(side="left", padx=(0, 16))
 
-        T.field_label(inner, "Specific").pack(side="left", padx=(0, 8))
+        T.field_label(top, "Specific").pack(side="left", padx=(0, 8))
         self.range_var = ctk.StringVar()
         self.range_combo = ctk.CTkComboBox(
-            inner, variable=self.range_var, values=[], command=self.load_invoices, **T.combo_kwargs(140),
+            top, variable=self.range_var, values=[], command=self.load_invoices, **T.combo_kwargs(140),
         )
         self.range_combo.pack(side="left", padx=(0, 20))
 
-        T.field_label(inner, "Search").pack(side="left", padx=(0, 8))
+        T.field_label(top, "Search").pack(side="left", padx=(0, 8))
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
-            inner, textvariable=self.search_var,
+            top, textvariable=self.search_var,
             placeholder_text="Customer name, phone, or product…", **T.entry_kwargs(220),
         )
         self.search_entry.pack(side="left", padx=(0, 10))
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_invoices())
 
         ctk.CTkButton(
-            inner, text="Refresh", command=self.load_invoices, **T.button_kwargs(width=100),
+            top, text="Refresh", command=self.load_invoices, **T.button_kwargs(width=100),
         ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            inner, text="Export PDF", command=self.export_report_pdf, **T.primary_button_kwargs(width=120),
+            top, text="Export PDF", command=self.export_report_pdf, **T.primary_button_kwargs(width=120),
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            top, text="Monthly totals", command=self.export_monthly_totals_pdf, **T.button_kwargs(width=130),
+        ).pack(side="left")
+
+        bottom = ctk.CTkFrame(card, fg_color="transparent")
+        bottom.pack(fill="x", padx=T.PAD_CARD, pady=(0, 14))
+
+        T.field_label(bottom, "From").pack(side="left", padx=(0, 8))
+        self.from_date_var = ctk.StringVar()
+        self.from_date_entry = ctk.CTkEntry(
+            bottom, textvariable=self.from_date_var,
+            placeholder_text="YYYY-MM-DD", **T.entry_kwargs(120),
+        )
+        self.from_date_entry.pack(side="left", padx=(0, 16))
+        self.from_date_entry.bind("<Return>", lambda e: self._apply_custom_dates())
+
+        T.field_label(bottom, "To").pack(side="left", padx=(0, 8))
+        self.to_date_var = ctk.StringVar()
+        self.to_date_entry = ctk.CTkEntry(
+            bottom, textvariable=self.to_date_var,
+            placeholder_text="YYYY-MM-DD", **T.entry_kwargs(120),
+        )
+        self.to_date_entry.pack(side="left", padx=(0, 12))
+        self.to_date_entry.bind("<Return>", lambda e: self._apply_custom_dates())
+
+        ctk.CTkButton(
+            bottom, text="Apply dates", command=self._apply_custom_dates, **T.button_kwargs(width=110),
+        ).pack(side="left", padx=(0, 12))
+        ctk.CTkLabel(
+            bottom,
+            text="Enter dates as YYYY-MM-DD (or MM/DD/YYYY). Use Custom dates period, or Apply dates.",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_TERTIARY,
         ).pack(side="left")
 
     def _show_today(self):
         self.period_var.set("Today")
         self.on_filter_change()
+
+    def _apply_custom_dates(self):
+        self.period_var.set("Custom dates")
+        self.range_combo.configure(state="disabled")
+        self.range_combo.configure(values=["Custom"])
+        self.range_var.set("Custom")
+        self.load_invoices()
 
     def create_summary(self):
         self.summary_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -146,6 +187,14 @@ class ReportsTab(ctk.CTkFrame):
             values = [f"Q{q} {year}" for q in range(1, 5)] + [f"Q{q} {year - 1}" for q in range(1, 5)]
             self.range_combo.configure(values=values)
             self.range_var.set(values[0])
+        elif period == "Custom dates":
+            self.range_combo.configure(state="disabled")
+            self.range_combo.configure(values=["Custom"])
+            self.range_var.set("Custom")
+            if not self.from_date_var.get().strip():
+                self.from_date_var.set(now.replace(day=1).strftime("%Y-%m-%d"))
+            if not self.to_date_var.get().strip():
+                self.to_date_var.set(now.strftime("%Y-%m-%d"))
         else:
             self.range_combo.configure(state="normal")
             values = [str(year - i) for i in range(3)]
@@ -154,12 +203,27 @@ class ReportsTab(ctk.CTkFrame):
 
         self.load_invoices()
 
+    @staticmethod
+    def _parse_user_date(raw: str, *, end_of_day: bool = False) -> str | None:
+        return parse_report_date(raw, end_of_day=end_of_day)
+
     def get_date_range(self):
         period = self.period_var.get()
         rng = self.range_var.get()
         start_date = end_date = None
         now = datetime.now()
         try:
+            if period == "Custom dates":
+                start_date = parse_report_date(self.from_date_var.get(), end_of_day=False)
+                end_date = parse_report_date(self.to_date_var.get(), end_of_day=True)
+                if not start_date or not end_date:
+                    return None, None
+                if start_date[:10] > end_date[:10]:
+                    start_d = datetime.strptime(end_date[:10], "%Y-%m-%d")
+                    end_d = datetime.strptime(start_date[:10], "%Y-%m-%d")
+                    start_date = start_d.strftime("%Y-%m-%d 00:00:00")
+                    end_date = end_d.strftime("%Y-%m-%d 23:59:59")
+                return start_date, end_date
             if period == "Today":
                 start_date = now.strftime("%Y-%m-%d 00:00:00")
                 end_date = now.strftime("%Y-%m-%d 23:59:59")
@@ -192,6 +256,10 @@ class ReportsTab(ctk.CTkFrame):
         rng = self.range_var.get()
         if period == "Today":
             return "Today"
+        if period == "Custom dates":
+            frm = (self.from_date_var.get() or "").strip() or "?"
+            to = (self.to_date_var.get() or "").strip() or "?"
+            return f"Custom: {frm} → {to}"
         return f"{period}: {rng}" if rng else period
 
     def load_invoices(self, *args):
@@ -199,6 +267,19 @@ class ReportsTab(ctk.CTkFrame):
             widget.destroy()
 
         start_date, end_date = self.get_date_range()
+        if self.period_var.get() == "Custom dates" and (not start_date or not end_date):
+            ctk.CTkLabel(
+                self.rows_frame,
+                text="Enter valid From and To dates (YYYY-MM-DD), then Apply dates.",
+                font=T.FONT, text_color=T.TEXT_TERTIARY,
+            ).pack(pady=40)
+            self._current_invoices = []
+            self.total_sales_var.set(format_currency(0))
+            self.total_tax_var.set(format_currency(0))
+            self.invoice_count_var.set("0")
+            self.avg_invoice_var.set(format_currency(0))
+            return
+
         query = self.search_var.get().strip()
         invoices = search_invoices(query, start_date, end_date)
         self._current_invoices = invoices
@@ -340,12 +421,15 @@ class ReportsTab(ctk.CTkFrame):
             toast(self, str(e), kind="error", title="Could not void sale")
             messagebox.showerror("Void failed", str(e))
 
-    def export_report_pdf(self):
-        # Accounting PDF: active (non-voided) sales only
-        invoices = [
+    def _active_invoices_for_export(self):
+        return [
             inv for inv in self._current_invoices
             if not int(getattr(inv, "voided", 0) or 0)
         ]
+
+    def export_report_pdf(self):
+        # Accounting PDF: active (non-voided) sales only
+        invoices = self._active_invoices_for_export()
         start_date, end_date = self.get_date_range()
         period = self._period_label()
         stamp = datetime.now().strftime("%Y%m%d")
@@ -370,6 +454,36 @@ class ReportsTab(ctk.CTkFrame):
             Path(path).write_bytes(pdf_bytes)
             self.winfo_toplevel().set_status(f"Saved report — {Path(path).name}")
             toast(self, f"Saved {Path(path).name}", kind="success", title="Sales report PDF")
+        except Exception as e:
+            toast(self, str(e), kind="error", title="PDF export failed")
+            messagebox.showerror("PDF export failed", str(e))
+
+    def export_monthly_totals_pdf(self):
+        invoices = self._active_invoices_for_export()
+        start_date, end_date = self.get_date_range()
+        period = self._period_label()
+        stamp = datetime.now().strftime("%Y%m%d")
+        default_name = f"monthly-totals-{stamp}.pdf"
+        path = filedialog.asksaveasfilename(
+            parent=self.winfo_toplevel(),
+            title="Save monthly totals PDF",
+            defaultextension=".pdf",
+            filetypes=[("PDF files", "*.pdf")],
+            initialfile=default_name,
+        )
+        if not path:
+            return
+        try:
+            from sales_report_pdf import build_monthly_totals_pdf
+            pdf_bytes = build_monthly_totals_pdf(
+                invoices,
+                period_label=period,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            Path(path).write_bytes(pdf_bytes)
+            self.winfo_toplevel().set_status(f"Saved monthly totals — {Path(path).name}")
+            toast(self, f"Saved {Path(path).name}", kind="success", title="Monthly totals PDF")
         except Exception as e:
             toast(self, str(e), kind="error", title="PDF export failed")
             messagebox.showerror("PDF export failed", str(e))
