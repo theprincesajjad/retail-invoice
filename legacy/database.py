@@ -18,6 +18,7 @@ def init_db():
                 qty INTEGER NOT NULL,
                 category TEXT,
                 import_date TEXT DEFAULT '',
+                sold_date TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -88,12 +89,41 @@ def _migrate_schema(conn):
         "ALTER TABLE invoices ADD COLUMN voided INTEGER DEFAULT 0",
         "ALTER TABLE invoices ADD COLUMN voided_at TEXT DEFAULT ''",
         "ALTER TABLE products ADD COLUMN import_date TEXT DEFAULT ''",
+        "ALTER TABLE products ADD COLUMN sold_date TEXT DEFAULT ''",
     ):
         try:
             cursor.execute(sql)
             conn.commit()
         except sqlite3.OperationalError:
             pass
+
+
+def _today_sold_date() -> str:
+    from datetime import datetime
+
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _refresh_sold_dates(cursor, product_ids: set[int] | list[int]) -> None:
+    """Set sold_date when qty hits 0; clear it when stock returns."""
+    ids = {int(pid) for pid in product_ids if pid}
+    if not ids:
+        return
+    today = _today_sold_date()
+    for pid in ids:
+        cursor.execute("SELECT qty, sold_date FROM products WHERE id = ?", (pid,))
+        row = cursor.fetchone()
+        if not row:
+            continue
+        qty = int(row["qty"] or 0)
+        sold = (row["sold_date"] or "") if "sold_date" in row.keys() else ""
+        if qty <= 0:
+            cursor.execute(
+                "UPDATE products SET sold_date = ? WHERE id = ?",
+                (sold or today, pid),
+            )
+        elif sold:
+            cursor.execute("UPDATE products SET sold_date = '' WHERE id = ?", (pid,))
 
 
 def apply_sku_prefix_categories(conn=None) -> int:
@@ -198,6 +228,7 @@ def _product_from_row(row) -> Product:
         category=d.get("category") or "",
         created_at=d.get("created_at") or "",
         import_date=d.get("import_date") or "",
+        sold_date=d.get("sold_date") or "",
     )
 
 
@@ -205,8 +236,8 @@ def add_product(product: Product):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO products (name, serial_number, sku, price, qty, category, import_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO products (name, serial_number, sku, price, qty, category, import_date, sold_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             product.name,
             product.serial_number,
@@ -215,6 +246,7 @@ def add_product(product: Product):
             product.qty,
             product.category,
             getattr(product, "import_date", "") or "",
+            getattr(product, "sold_date", "") or "",
         ))
         conn.commit()
         return cursor.lastrowid
@@ -224,7 +256,7 @@ def update_product(product: Product):
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE products 
-            SET name=?, serial_number=?, sku=?, price=?, qty=?, category=?, import_date=?
+            SET name=?, serial_number=?, sku=?, price=?, qty=?, category=?, import_date=?, sold_date=?
             WHERE id=?
         ''', (
             product.name,
@@ -234,6 +266,7 @@ def update_product(product: Product):
             product.qty,
             product.category,
             getattr(product, "import_date", "") or "",
+            getattr(product, "sold_date", "") or "",
             product.id,
         ))
         conn.commit()
@@ -311,6 +344,7 @@ def save_invoice(invoice: Invoice, items: list[InvoiceItem]):
 
 
 def _insert_invoice_items(cursor, invoice_id: int, items: list[InvoiceItem], *, adjust_stock: bool):
+    touched: set[int] = set()
     for item in items:
         cursor.execute('''
             INSERT INTO invoice_items (invoice_id, product_id, description, serial_number, qty, unit_price, line_total)
@@ -324,6 +358,9 @@ def _insert_invoice_items(cursor, invoice_id: int, items: list[InvoiceItem], *, 
                 "UPDATE products SET qty = qty - ? WHERE id = ?",
                 (item.qty, item.product_id),
             )
+            touched.add(int(item.product_id))
+    if adjust_stock:
+        _refresh_sold_dates(cursor, touched)
 
 
 def get_invoice_by_id(invoice_id: int) -> Invoice | None:
@@ -367,6 +404,7 @@ def update_invoice(invoice: Invoice, items: list[InvoiceItem]) -> None:
             raise ValueError("Cannot edit a voided sale")
         cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice.id,))
         old_items = cursor.fetchall()
+        touched: set[int] = set()
         for old in old_items:
             pid = old["product_id"]
             if pid:
@@ -374,6 +412,7 @@ def update_invoice(invoice: Invoice, items: list[InvoiceItem]) -> None:
                     "UPDATE products SET qty = qty + ? WHERE id = ?",
                     (old["qty"], pid),
                 )
+                touched.add(int(pid))
         cursor.execute("DELETE FROM invoice_items WHERE invoice_id = ?", (invoice.id,))
         cursor.execute('''
             UPDATE invoices SET
@@ -392,6 +431,10 @@ def update_invoice(invoice: Invoice, items: list[InvoiceItem]) -> None:
             invoice.id,
         ))
         _insert_invoice_items(cursor, invoice.id, items, adjust_stock=True)
+        for item in items:
+            if item.product_id:
+                touched.add(int(item.product_id))
+        _refresh_sold_dates(cursor, touched)
         conn.commit()
 
 
@@ -409,6 +452,7 @@ def void_invoice(invoice_id: int) -> Invoice:
         if int(data.get("voided") or 0):
             raise ValueError("This sale is already voided")
         cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice_id,))
+        touched: set[int] = set()
         for old in cursor.fetchall():
             pid = old["product_id"]
             if pid:
@@ -416,6 +460,8 @@ def void_invoice(invoice_id: int) -> Invoice:
                     "UPDATE products SET qty = qty + ? WHERE id = ?",
                     (old["qty"], pid),
                 )
+                touched.add(int(pid))
+        _refresh_sold_dates(cursor, touched)
         from datetime import datetime
         voided_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute(

@@ -2,6 +2,17 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.9] — 2026-09-14
+
+### Products
+
+- **Sync Excel** / **Choose Excel…** — two-way sync with a local inventory workbook
+- Sheet columns: SKU, Status (In-Stock / Sold), Product Description, Details, qty, Category, price, date added, date sold
+- Pull new/edited rows from Excel on Sync; rewrite Excel from current inventory
+- Sales / voids / product edits auto-update the Excel when a file is configured (Status + date sold)
+
+---
+
 ## [1.6.8] — 2026-09-14
 
 ### Sales History

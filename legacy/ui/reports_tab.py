@@ -411,6 +411,11 @@ class ReportsTab(ctk.CTkFrame):
 
         try:
             db_void_invoice(invoice.id)
+            try:
+                from inventory_excel_sync import try_auto_export_inventory_excel
+                try_auto_export_inventory_excel()
+            except Exception:
+                pass
             self.winfo_toplevel().set_status(f"Voided {invoice.invoice_number}")
             toast(self, f"Voided {invoice.invoice_number} — stock restored", kind="success", title="Sale voided")
             app = self.winfo_toplevel()

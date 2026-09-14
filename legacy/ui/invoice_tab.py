@@ -709,6 +709,8 @@ class InvoiceTab(ctk.CTkFrame):
             self.clear_form(keep_customer=False)
             app = self.winfo_toplevel()
             try:
+                from inventory_excel_sync import try_auto_export_inventory_excel
+                try_auto_export_inventory_excel()
                 if hasattr(app, "inventory_tab"):
                     app.inventory_tab.load_products()
                 if hasattr(app, "reports_tab"):

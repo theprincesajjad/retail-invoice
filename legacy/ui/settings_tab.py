@@ -82,6 +82,13 @@ class SettingsTab(ctk.CTkFrame):
         self.entries["logo_path"].pack(side="left", fill="x", expand=True, padx=(0, 10))
         ctk.CTkButton(logo_row, text="Choose file", command=self.browse_logo, **T.button_kwargs(width=110)).pack(side="left")
 
+        T.field_label(pr_inner, "Inventory Excel (optional)", "Products → Sync Excel uses this file").pack(anchor="w")
+        inv_row = ctk.CTkFrame(pr_inner, fg_color="transparent")
+        inv_row.pack(fill="x", pady=(6, 14))
+        self.entries["inventory_excel_path"] = ctk.CTkEntry(inv_row, **T.entry_kwargs())
+        self.entries["inventory_excel_path"].pack(side="left", fill="x", expand=True, padx=(0, 10))
+        ctk.CTkButton(inv_row, text="Choose file", command=self.browse_inventory_excel, **T.button_kwargs(width=110)).pack(side="left")
+
         T.field_label(pr_inner, "Select your printer").pack(anchor="w", pady=(0, 4))
         pr_row = ctk.CTkFrame(pr_inner, fg_color="transparent")
         pr_row.pack(fill="x", pady=(0, 10))
@@ -325,6 +332,24 @@ class SettingsTab(ctk.CTkFrame):
                 self.entries["logo_path"].insert(0, str(dest))
             except Exception as e:
                 messagebox.showerror("Error", str(e))
+
+    def browse_inventory_excel(self):
+        from inventory_excel_sync import default_inventory_excel_path
+
+        current = self.entries.get("inventory_excel_path")
+        initial = (current.get().strip() if current else "") or str(default_inventory_excel_path())
+        filepath = filedialog.asksaveasfilename(
+            title="Choose inventory Excel file",
+            defaultextension=".xlsx",
+            initialfile=os.path.basename(initial) or "inventory.xlsx",
+            initialdir=os.path.dirname(initial) or str(DATA_DIR),
+            filetypes=(("Excel spreadsheet", "*.xlsx"), ("All files", "*.*")),
+        )
+        if filepath:
+            if not filepath.lower().endswith(".xlsx"):
+                filepath = f"{filepath}.xlsx"
+            self.entries["inventory_excel_path"].delete(0, "end")
+            self.entries["inventory_excel_path"].insert(0, filepath)
 
     def test_print(self):
         from printer import print_test_receipt

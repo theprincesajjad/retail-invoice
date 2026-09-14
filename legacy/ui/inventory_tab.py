@@ -1,16 +1,6 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from pathlib import Path
-from database import (
-    add_product,
-    update_product,
-    delete_product,
-    search_products,
-    list_all_products,
-    reapply_sku_prefix_categories,
-)
-from models import Product
-from product_categories import PRODUCT_CATEGORIES, category_for_sku
 from product_import import (
     TEMPLATE_HEADERS,
     ensure_templates,
@@ -20,7 +10,24 @@ from product_import import (
     write_products_csv,
     today_date_stamp,
 )
+from inventory_excel_sync import (
+    default_inventory_excel_path,
+    resolve_inventory_excel_path,
+    sync_inventory_excel as run_inventory_excel_sync,
+)
 from utils import format_currency
+from database import (
+    add_product,
+    update_product,
+    delete_product,
+    search_products,
+    list_all_products,
+    reapply_sku_prefix_categories,
+    get_setting,
+    save_setting,
+)
+from models import Product
+from product_categories import PRODUCT_CATEGORIES, category_for_sku
 from . import theme as T
 from .dialogs import ask_yes_no
 from .toast import toast
@@ -67,6 +74,20 @@ class InventoryTab(ctk.CTkFrame):
             text="Import CSV",
             command=self.import_products,
             **T.button_kwargs(width=120),
+        ).pack(side="left", padx=(10, 0))
+
+        ctk.CTkButton(
+            inner,
+            text="Sync Excel",
+            command=self.sync_inventory_excel,
+            **T.primary_button_kwargs(width=120),
+        ).pack(side="left", padx=(10, 0))
+
+        ctk.CTkButton(
+            inner,
+            text="Choose Excel…",
+            command=self.choose_inventory_excel,
+            **T.button_kwargs(width=130),
         ).pack(side="left", padx=(10, 0))
 
         ctk.CTkButton(
@@ -206,6 +227,91 @@ class InventoryTab(ctk.CTkFrame):
         )
         self.winfo_toplevel().set_status("SKU category rules applied")
 
+    def choose_inventory_excel(self):
+        """Pick or create the local inventory Excel workbook used for Sync."""
+        current = ""
+        try:
+            current = str(resolve_inventory_excel_path())
+        except Exception:
+            current = str(default_inventory_excel_path())
+        path = filedialog.asksaveasfilename(
+            parent=self.winfo_toplevel(),
+            title="Choose inventory Excel file",
+            defaultextension=".xlsx",
+            initialfile=Path(current).name if current else "inventory.xlsx",
+            initialdir=str(Path(current).parent) if current else None,
+            filetypes=[("Excel spreadsheet", "*.xlsx"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        dest = Path(path)
+        if dest.suffix.lower() != ".xlsx":
+            dest = dest.with_suffix(".xlsx")
+        save_setting("inventory_excel_path", str(dest))
+        try:
+            result = run_inventory_excel_sync(dest)
+            self.load_products()
+            msg = f"Using {dest.name} · {result.exported} products written"
+            if result.added or result.updated:
+                msg += f" · pulled {result.added} new, {result.updated} updated"
+            toast(self, msg, kind="success", title="Inventory Excel")
+            self.winfo_toplevel().set_status(f"Inventory Excel: {dest}")
+        except Exception as e:
+            messagebox.showerror("Could not set Excel file", str(e), parent=self.winfo_toplevel())
+
+    def sync_inventory_excel(self):
+        """
+        Sync the local inventory Excel:
+          - Pull new/edited products from the spreadsheet into the app
+          - Rewrite the spreadsheet with current Status / qty / date sold
+        """
+        path = resolve_inventory_excel_path()
+        if not path.exists():
+            # First-time: offer to create at default or chosen path
+            create = ask_yes_no(
+                self.winfo_toplevel(),
+                "Create inventory Excel?",
+                (
+                    f"No inventory Excel found yet.\n\n"
+                    f"Create one at:\n{path}\n\n"
+                    "You can change the location with Choose Excel…"
+                ),
+                confirm_label="Create & sync",
+                cancel_label="Cancel",
+            )
+            if not create:
+                return
+        try:
+            result = run_inventory_excel_sync(path)
+            self.load_products()
+            parts = [f"{result.exported} in Excel"]
+            if result.created_file:
+                parts.insert(0, "file created")
+            if result.added:
+                parts.append(f"{result.added} added from Excel")
+            if result.updated:
+                parts.append(f"{result.updated} updated from Excel")
+            summary = " · ".join(parts)
+            toast(self, summary, kind="success", title="Excel synced")
+            self.winfo_toplevel().set_status(f"Synced {result.path.name} — {summary}")
+            if result.errors:
+                messagebox.showwarning(
+                    "Some Excel rows had problems",
+                    "\n".join(result.errors[:12]),
+                    parent=self.winfo_toplevel(),
+                )
+        except PermissionError:
+            messagebox.showerror(
+                "Excel file is open",
+                (
+                    f"Could not write:\n{path}\n\n"
+                    "Close the spreadsheet in Excel, then Sync again."
+                ),
+                parent=self.winfo_toplevel(),
+            )
+        except Exception as e:
+            messagebox.showerror("Sync failed", str(e), parent=self.winfo_toplevel())
+
     def import_products(self):
         path = filedialog.askopenfilename(
             parent=self.winfo_toplevel(),
@@ -343,6 +449,11 @@ class InventoryTab(ctk.CTkFrame):
         ):
             delete_product(product.id)
             self.load_products()
+            try:
+                from inventory_excel_sync import try_auto_export_inventory_excel
+                try_auto_export_inventory_excel()
+            except Exception:
+                pass
             self.winfo_toplevel().set_status(f"Deleted {product.name}")
             toast(self, f"Removed {product.name}", kind="info")
 
@@ -495,7 +606,17 @@ class InventoryTab(ctk.CTkFrame):
                     qty=qty,
                     category=category,
                     created_at="",
+                    import_date=(
+                        (getattr(product, "import_date", "") or "")
+                        if product
+                        else today_date_stamp()
+                    ),
+                    sold_date=(getattr(product, "sold_date", "") or "") if product else "",
                 )
+                if qty > 0:
+                    new_product.sold_date = ""
+                elif not new_product.sold_date:
+                    new_product.sold_date = today_date_stamp()
 
                 if product:
                     update_product(new_product)
@@ -511,6 +632,11 @@ class InventoryTab(ctk.CTkFrame):
                         self.after(120, self.show_product_dialog)
 
                 self.load_products()
+                try:
+                    from inventory_excel_sync import try_auto_export_inventory_excel
+                    try_auto_export_inventory_excel()
+                except Exception:
+                    pass
             except ValueError as e:
                 messagebox.showerror("Please check your entries", str(e), parent=dialog)
 

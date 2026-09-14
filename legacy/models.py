@@ -14,6 +14,7 @@ class Product:
     category: str
     created_at: str = ""
     import_date: str = ""
+    sold_date: str = ""
 
 @dataclass
 class InvoiceItem:
