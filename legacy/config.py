@@ -53,6 +53,7 @@ DEFAULT_SETTINGS = {
     "smtp_password": "",
     "smtp_from_name": "My Business",
     "setup_complete": "",
+    "inventory_excel_path": "",
 }
 
 def get_db_connection():

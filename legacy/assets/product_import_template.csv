@@ -1,3 +1,4 @@
-SKU,Product Name,Details,Qty,Price
-60000,Dell Latitude Laptop,i5 16GB 512GB,2,699.99
-60001,Laptop Case,15.6 inch,10,15.0
+SKU,Product Name,Details,Qty,Price,Category,Date Stamp
+60000,Dell Latitude Laptop,i5 16GB 512GB,2,699.99,Laptops,
+92001,ThinkPad X1,16GB 512GB,1,899.0,Laptops,
+110001,iPhone 13,128GB Blue,3,499.0,Cell Phones,

@@ -1,19 +1,19 @@
-## Retail Invoice 1.6.0
+## Retail Invoice 1.6.9
 
-Download `RetailInvoice-1.6.0-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.9-Windows.exe`, double-click, and go.
 
-### What’s new
+### Products
 
-- **Batch product import** — On Products, download an Excel/CSV template (SKU, Product Name, Details, Qty, Price), fill it in (or use Google Sheets), then Import
-- **Discount before or after tax** on New Sale (default in Setup)
-- **Scrollable totals / notes** rail for 125% Windows display scaling
-- Uniform **Save Next (F5)** / **Save Close (F6)** on Add Product
-- After **F12**: **F7 Cash** / **F8 Card**, then **F12** to confirm
-- Blank line between items on printed receipts
+- **Sync Excel** — keep a local inventory spreadsheet in sync with the app
+- Columns: SKU, Status (In-Stock / Sold), Product Description, Details, qty, Category, price, date added, date sold
+- Add products in Excel, then Sync to pull them in; sales update Status and date sold automatically
+- **Choose Excel…** to pick the file location (also under Settings)
 
-### Hotkeys
+### Also recent
 
-F1 New · F2 Products · F3 Sales · F4 Setup · F5/F6 product save · F10 Save · F11 Preview · F12 Complete + Print · F7/F8 payment · F12 confirm
+- 1.6.8: Custom sales date range + monthly totals PDF
+- 1.6.7: Add / Edit product scrollable form
+- 1.6.5: Void sale from Sales History
 
 ### Requirements
 

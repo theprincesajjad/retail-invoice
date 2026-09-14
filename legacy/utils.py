@@ -14,6 +14,23 @@ def parse_currency(amount_str: str) -> float:
         return 0.0
 
 
+def parse_report_date(raw: str, *, end_of_day: bool = False) -> str | None:
+    """Parse a user-entered report date into `YYYY-MM-DD HH:MM:SS`."""
+    from datetime import datetime
+
+    text = (raw or "").strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d"):
+        try:
+            dt = datetime.strptime(text, fmt)
+            suffix = "23:59:59" if end_of_day else "00:00:00"
+            return dt.strftime(f"%Y-%m-%d {suffix}")
+        except ValueError:
+            continue
+    return None
+
+
 def compute_invoice_totals(
     items,
     tax_rate: float,
