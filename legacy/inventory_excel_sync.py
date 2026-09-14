@@ -94,6 +94,51 @@ def product_status(product: Product) -> str:
     return STATUS_IN_STOCK if int(getattr(product, "qty", 0) or 0) > 0 else STATUS_SOLD
 
 
+def _category_sort_key(category: str) -> tuple:
+    cat = (category or "").strip()
+    if not cat:
+        return (1, "")  # blank / uncategorized last
+    return (0, cat.casefold())
+
+
+def _sku_sort_key(sku: str) -> tuple:
+    """Sort SKUs low → high (numeric when possible)."""
+    text = (sku or "").strip()
+    if not text:
+        return (1, 0, "")
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if digits:
+        try:
+            return (0, int(digits), text.casefold())
+        except ValueError:
+            pass
+    return (1, 0, text.casefold())
+
+
+def organize_products_for_excel(products: list[Product]) -> list[Product | None]:
+    """
+    Sort by Category (A→Z), then SKU low→high within each category.
+    Insert None placeholders between categories (blank Excel rows for new items).
+    """
+    ordered = sorted(
+        products,
+        key=lambda p: (_category_sort_key(getattr(p, "category", "") or ""), _sku_sort_key(p.sku or "")),
+    )
+    if not ordered:
+        return []
+
+    rows: list[Product | None] = []
+    prev_cat = None
+    for p in ordered:
+        cat = (getattr(p, "category", "") or "").strip().casefold()
+        if prev_cat is not None and cat != prev_cat:
+            # Blank gap so new products can be typed between category blocks
+            rows.extend([None, None, None])
+        rows.append(p)
+        prev_cat = cat
+    return rows
+
+
 def write_inventory_excel(path: Path | str, products: list[Product]) -> Path:
     """Rewrite the inventory workbook from current products."""
     from openpyxl import Workbook
@@ -109,7 +154,11 @@ def write_inventory_excel(path: Path | str, products: list[Product]) -> Path:
         cell = ws.cell(row=1, column=col, value=header)
         cell.font = Font(bold=True)
 
-    for p in products:
+    for item in organize_products_for_excel(products):
+        if item is None:
+            ws.append([None] * len(SYNC_HEADERS))
+            continue
+        p = item
         status = product_status(p)
         sold = (getattr(p, "sold_date", "") or "") if status == STATUS_SOLD else ""
         ws.append([

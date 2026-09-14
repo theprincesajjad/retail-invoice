@@ -1,19 +1,16 @@
-## Retail Invoice 1.6.9
+## Retail Invoice 1.6.10
 
-Download `RetailInvoice-1.6.9-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.10-Windows.exe`, double-click, and go.
 
-### Products
+### Products / Excel sync
 
-- **Sync Excel** — keep a local inventory spreadsheet in sync with the app
-- Columns: SKU, Status (In-Stock / Sold), Product Description, Details, qty, Category, price, date added, date sold
-- Add products in Excel, then Sync to pull them in; sales update Status and date sold automatically
-- **Choose Excel…** to pick the file location (also under Settings)
+- Inventory Excel is organized by **Category**, then **SKU low → high**
+- **Blank rows** between categories so you can type in new items before the next Sync
 
 ### Also recent
 
+- 1.6.9: Sync Excel inventory (Status + date sold)
 - 1.6.8: Custom sales date range + monthly totals PDF
-- 1.6.7: Add / Edit product scrollable form
-- 1.6.5: Void sale from Sales History
 
 ### Requirements
 

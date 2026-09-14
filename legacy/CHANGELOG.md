@@ -2,6 +2,15 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.10] — 2026-09-14
+
+### Products / Excel sync
+
+- Sync rewrites the sheet **by Category**, with **SKU low → high** inside each category
+- **Blank row gaps** between categories for adding new items in Excel
+
+---
+
 ## [1.6.9] — 2026-09-14
 
 ### Products

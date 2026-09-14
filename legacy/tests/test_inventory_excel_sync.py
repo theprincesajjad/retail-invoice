@@ -11,6 +11,7 @@ from inventory_excel_sync import (
     STATUS_SOLD,
     SYNC_HEADERS,
     export_inventory_excel,
+    organize_products_for_excel,
     product_status,
     pull_inventory_excel,
     read_sync_rows,
@@ -67,10 +68,54 @@ def test_write_and_read_roundtrip(tmp_path: Path):
     path = write_inventory_excel(tmp_path / "inv.xlsx", products)
     rows = read_sync_rows(path)
     assert len(rows) == 2
-    assert rows[0]["status"] == STATUS_IN_STOCK
-    assert rows[0]["name"] == "Laptop"
-    assert rows[1]["status"] == STATUS_SOLD
-    assert rows[1]["sold_date"] == "2026-09-10"
+    # Sorted by category A→Z: Cell Phones before Laptops
+    assert rows[0]["status"] == STATUS_SOLD
+    assert rows[0]["name"] == "Phone"
+    assert rows[0]["sold_date"] == "2026-09-10"
+    assert rows[1]["status"] == STATUS_IN_STOCK
+    assert rows[1]["name"] == "Laptop"
+
+
+def test_excel_sorted_by_category_then_sku_with_gaps(tmp_path: Path):
+    products = [
+        _product(sku="92050", name="B Laptop", category="Laptops"),
+        _product(id=2, sku="92010", name="A Laptop", category="Laptops"),
+        _product(id=3, sku="110200", name="B Phone", category="Cell Phones"),
+        _product(id=4, sku="110050", name="A Phone", category="Cell Phones"),
+        _product(id=5, sku="60001", name="Monitor", category="Monitors"),
+    ]
+    organized = organize_products_for_excel(products)
+    # 5 products + 3 blank gaps between 3 categories
+    assert len(organized) == 5 + 3 + 3
+    # Categories: Cell Phones → Laptops → Monitors
+    names = [p.name if p else None for p in organized]
+    assert names == [
+        "A Phone",
+        "B Phone",
+        None, None, None,
+        "A Laptop",
+        "B Laptop",
+        None, None, None,
+        "Monitor",
+    ]
+    # SKUs low→high within Cell Phones
+    assert organized[0].sku == "110050"
+    assert organized[1].sku == "110200"
+    assert organized[5].sku == "92010"
+    assert organized[6].sku == "92050"
+
+    path = write_inventory_excel(tmp_path / "sorted.xlsx", products)
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, data_only=True)
+    ws = wb.active
+    sheet_rows = list(ws.iter_rows(min_row=2, values_only=True))
+    wb.close()
+    # Blank gap rows are fully empty
+    assert sheet_rows[2] == (None,) * 9 or all(c is None or c == "" for c in sheet_rows[2])
+    # Product rows only (pull ignores blanks)
+    rows = read_sync_rows(path)
+    assert [r["sku"] for r in rows] == ["110050", "110200", "92010", "92050", "60001"]
 
 
 def test_sync_pulls_new_sku_then_exports(db, tmp_path: Path):
