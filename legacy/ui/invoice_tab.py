@@ -148,7 +148,7 @@ class InvoiceTab(ctk.CTkFrame):
 
         hdr = ctk.CTkFrame(self.items_scroll, fg_color="transparent")
         hdr.pack(fill="x", padx=10, pady=(10, 6))
-        for text, w in [("#", 32), ("Item", 260), ("Qty", 100), ("Price", 90), ("Total", 90)]:
+        for text, w in [("#", 32), ("SKU", 72), ("Item", 220), ("Qty", 100), ("Price", 90), ("Total", 90)]:
             ctk.CTkLabel(hdr, text=text, width=w, **T.table_header_kwargs()).pack(side="left", padx=4)
 
         self.item_rows_frame = ctk.CTkFrame(self.items_scroll, fg_color="transparent")
@@ -543,10 +543,14 @@ class InvoiceTab(ctk.CTkFrame):
                 ctk.CTkLabel(row, text=str(i + 1), width=32, anchor="w", font=T.FONT, text_color=T.TEXT).pack(
                     side="left", padx=4, pady=10
                 )
+                sku_text = (getattr(item, "sku", None) or "").strip() or "—"
+                ctk.CTkLabel(row, text=sku_text, width=72, anchor="w", font=T.FONT, text_color=T.TEXT).pack(
+                    side="left", padx=4
+                )
                 desc_text = item.description
                 if item.serial_number:
                     desc_text += f"\n  Details: {item.serial_number}"
-                ctk.CTkLabel(row, text=desc_text, width=220, anchor="w", font=T.FONT, text_color=T.TEXT, justify="left").pack(
+                ctk.CTkLabel(row, text=desc_text, width=200, anchor="w", font=T.FONT, text_color=T.TEXT, justify="left").pack(
                     side="left", padx=4
                 )
 

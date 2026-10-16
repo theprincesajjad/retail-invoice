@@ -31,6 +31,34 @@ def parse_report_date(raw: str, *, end_of_day: bool = False) -> str | None:
     return None
 
 
+def current_quarter_label(now=None) -> str:
+    """Return e.g. ``Q4 2026`` for the calendar quarter containing ``now``."""
+    from datetime import datetime
+
+    dt = now or datetime.now()
+    q = (dt.month - 1) // 3 + 1
+    return f"Q{q} {dt.year}"
+
+
+def quarter_date_range(label: str) -> tuple[str, str] | tuple[None, None]:
+    """Parse ``Q{n} YYYY`` into start/end timestamps (inclusive)."""
+    import calendar
+    from datetime import datetime
+
+    text = (label or "").strip()
+    try:
+        q_part, y_part = text.split()
+        year = int(y_part)
+        quarter = int(q_part[1])
+        start_month, end_month = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}[quarter]
+        start_date = f"{year}-{start_month:02d}-01 00:00:00"
+        _, last_day = calendar.monthrange(year, end_month)
+        end_date = f"{year}-{end_month:02d}-{last_day} 23:59:59"
+        return start_date, end_date
+    except (ValueError, KeyError, IndexError):
+        return None, None
+
+
 def compute_invoice_totals(
     items,
     tax_rate: float,
