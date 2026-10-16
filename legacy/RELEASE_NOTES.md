@@ -1,17 +1,16 @@
-## Retail Invoice 1.6.13
+## Retail Invoice 1.6.14
 
-Download `RetailInvoice-1.6.13-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.14-Windows.exe`, double-click, and go.
 
 ### Fixes
 
-- **Sales History From/To** now drive the list and PDF exports — set a 3‑month (or any) range, Apply dates / Refresh, then Export PDF or Monthly totals
-- **View / Print / Email** reload the sale from the database so receipts open reliably for sales in the selected range
-- Export buttons sit on the date row so they stay reachable
+- **Show totals** shows the money / tax / count / average cards again (no empty gray bar)
+- **Export PDF / Monthly totals** work for ranges longer than ~45 days (no longer load every line item just to export)
 
 ### Also recent
 
-- 1.6.12: Products search row + SKU on receipts / search
-- 1.6.11: Sales totals hidden until Show totals
+- 1.6.13: From/To date range + View receipt reload
+- 1.6.12: Products search row + SKU on receipts
 
 ### Requirements
 

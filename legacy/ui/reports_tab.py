@@ -131,23 +131,48 @@ class ReportsTab(ctk.CTkFrame):
     def toggle_totals(self):
         """Show or hide period summary totals (privacy when browsing with a customer)."""
         self._totals_visible = not self._totals_visible
+        if self._totals_visible:
+            self._refresh_summary_values()
         self._apply_totals_visibility()
+
+    def _summary_grid_kwargs(self):
+        return dict(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
 
     def _apply_totals_visibility(self):
         if not hasattr(self, "summary_frame"):
             return
         if self._totals_visible:
-            self.summary_frame.grid()
+            # Always re-pass grid options — bare grid() after grid_remove can leave a zero-height strip
+            self.summary_frame.grid(**self._summary_grid_kwargs())
             if hasattr(self, "totals_toggle_btn"):
                 self.totals_toggle_btn.configure(text="Hide totals")
+            try:
+                self.summary_frame.update_idletasks()
+                self.update_idletasks()
+            except Exception:
+                pass
         else:
             self.summary_frame.grid_remove()
             if hasattr(self, "totals_toggle_btn"):
                 self.totals_toggle_btn.configure(text="Show totals")
 
+    def _refresh_summary_values(self):
+        active = [
+            inv for inv in self._current_invoices
+            if not int(getattr(inv, "voided", 0) or 0)
+        ]
+        total_sales = sum(float(inv.total or 0) for inv in active)
+        total_tax = sum(float(inv.tax_amount or 0) for inv in active)
+        count = len(active)
+        avg = total_sales / count if count else 0
+        self.total_sales_var.set(format_currency(total_sales))
+        self.total_tax_var.set(format_currency(total_tax))
+        self.invoice_count_var.set(str(count))
+        self.avg_invoice_var.set(format_currency(avg))
+
     def create_summary(self):
         self.summary_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.summary_frame.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
+        self.summary_frame.grid(**self._summary_grid_kwargs())
 
         self.total_sales_var = ctk.StringVar(value="$0.00")
         self.total_tax_var = ctk.StringVar(value="$0.00")
@@ -162,7 +187,7 @@ class ReportsTab(ctk.CTkFrame):
         ]
         for i, (title, var, bg, fg) in enumerate(summaries):
             box = ctk.CTkFrame(self.summary_frame, fg_color=bg, corner_radius=T.RADIUS_LG, border_width=0)
-            box.grid(row=0, column=i, padx=(0 if i == 0 else 8, 0), sticky="ew")
+            box.grid(row=0, column=i, padx=(0 if i == 0 else 8, 0), sticky="nsew")
             self.summary_frame.grid_columnconfigure(i, weight=1)
             ctk.CTkLabel(box, text=title, font=T.FONT_SMALL, text_color=T.TEXT_SECONDARY).pack(
                 padx=18, pady=(16, 0), anchor="w"
@@ -328,17 +353,16 @@ class ReportsTab(ctk.CTkFrame):
                 font=T.FONT, text_color=T.TEXT_TERTIARY,
             ).pack(pady=40)
             self._current_invoices = []
-            self.total_sales_var.set(format_currency(0))
-            self.total_tax_var.set(format_currency(0))
-            self.invoice_count_var.set("0")
-            self.avg_invoice_var.set(format_currency(0))
+            self._refresh_summary_values()
             return
 
         query = self.search_var.get().strip()
         try:
-            invoices = search_invoices(query, start_date, end_date)
+            # Headers only — loading every line item for long ranges made exports hang
+            invoices = search_invoices(query, start_date, end_date, include_items=False)
         except Exception as e:
             self._current_invoices = []
+            self._refresh_summary_values()
             toast(self, str(e), kind="error", title="Could not load sales")
             ctk.CTkLabel(
                 self.rows_frame,
@@ -347,17 +371,7 @@ class ReportsTab(ctk.CTkFrame):
             ).pack(pady=40)
             return
         self._current_invoices = invoices
-
-        active = [inv for inv in invoices if not int(getattr(inv, "voided", 0) or 0)]
-        total_sales = sum(inv.total for inv in active)
-        total_tax = sum(inv.tax_amount for inv in active)
-        count = len(active)
-        avg = total_sales / count if count else 0
-
-        self.total_sales_var.set(format_currency(total_sales))
-        self.total_tax_var.set(format_currency(total_tax))
-        self.invoice_count_var.set(str(count))
-        self.avg_invoice_var.set(format_currency(avg))
+        self._refresh_summary_values()
 
         if not invoices:
             ctk.CTkLabel(
@@ -496,12 +510,14 @@ class ReportsTab(ctk.CTkFrame):
         if not start_date or not end_date:
             return [], start_date, end_date
         query = self.search_var.get().strip()
-        invoices = search_invoices(query, start_date, end_date)
+        # PDF exports only need invoice headers (totals / dates) — skip line items
+        invoices = search_invoices(query, start_date, end_date, include_items=False)
         active = [
             inv for inv in invoices
             if not int(getattr(inv, "voided", 0) or 0)
         ]
         self._current_invoices = invoices
+        self._refresh_summary_values()
         return active, start_date, end_date
 
     def _ask_pdf_path(self, title: str, default_name: str) -> str | None:

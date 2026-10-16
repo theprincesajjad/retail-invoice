@@ -86,10 +86,11 @@ def test_three_month_exports(db, tmp_path: Path):
     end = "2026-09-30 23:59:59"
     invoices = [
         inv
-        for inv in db.search_invoices("", start, end)
+        for inv in db.search_invoices("", start, end, include_items=False)
         if not int(getattr(inv, "voided", 0) or 0)
     ]
     assert len(invoices) == 3
+    assert all(inv.items == [] for inv in invoices)
     label = f"{start[:10]} to {end[:10]}"
     sales = build_sales_report_pdf(
         invoices,
@@ -109,3 +110,54 @@ def test_three_month_exports(db, tmp_path: Path):
     assert monthly[:4] == b"%PDF"
     (tmp_path / "sales.pdf").write_bytes(sales)
     (tmp_path / "monthly.pdf").write_bytes(monthly)
+
+
+def test_long_range_headers_only_is_fast(db):
+    """Many invoices across >45 days must not require loading every line item."""
+    pid = db.add_product(
+        Product(None, "Widget", "", "60001", 25.0, 500, "Monitors")
+    )
+    # ~90 days of sales (more than the reported ~45-day failure window)
+    from datetime import datetime, timedelta
+
+    for day in range(90):
+        when = datetime(2026, 7, 1) + timedelta(days=day)
+        created = when.strftime("%Y-%m-%d 12:00:00")
+        inv = Invoice(
+            None,
+            f"INV-L{day:04d}",
+            "Pat",
+            "",
+            25.0,
+            0.0,
+            0.0,
+            25.0,
+            "Cash",
+            "",
+            created,
+            [],
+        )
+        items = [
+            InvoiceItem(None, None, pid, "Widget", "", 1, 25.0, 25.0, sku="60001")
+        ]
+        iid = db.save_invoice(inv, items)
+        with config.get_db_connection() as conn:
+            conn.execute("UPDATE invoices SET created_at=? WHERE id=?", (created, iid))
+            conn.commit()
+
+    start = "2026-07-01 00:00:00"
+    end = "2026-09-30 23:59:59"
+    headers = db.search_invoices("", start, end, include_items=False)
+    assert len(headers) == 90
+    assert all(h.items == [] for h in headers)
+    pdf = build_monthly_totals_pdf(
+        headers,
+        period_label="2026-07-01 to 2026-09-30",
+        start_date=start,
+        end_date=end,
+        settings={"business_name": "Shop"},
+    )
+    assert pdf[:4] == b"%PDF"
+    # Full item load still works for a single sale
+    fresh = db.get_invoice_by_id(headers[0].id)
+    assert len(fresh.items) == 1

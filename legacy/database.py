@@ -498,15 +498,21 @@ def void_invoice(invoice_id: int) -> Invoice:
     return loaded
 
 
-def get_invoices(start_date=None, end_date=None, search_query=""):
-    return _fetch_invoices(start_date, end_date, search_query)
+def get_invoices(start_date=None, end_date=None, search_query="", *, include_items: bool = True):
+    return _fetch_invoices(start_date, end_date, search_query, include_items=include_items)
 
 
-def search_invoices(search_query="", start_date=None, end_date=None):
-    return _fetch_invoices(start_date, end_date, search_query)
+def search_invoices(search_query="", start_date=None, end_date=None, *, include_items: bool = True):
+    return _fetch_invoices(start_date, end_date, search_query, include_items=include_items)
 
 
-def _fetch_invoices(start_date=None, end_date=None, search_query=""):
+def _fetch_invoices(start_date=None, end_date=None, search_query="", *, include_items: bool = True):
+    """
+    Fetch invoices in a date/search window.
+
+    include_items=False skips per-invoice line loads (much faster for long
+    Sales History ranges / PDF exports that only need totals and headers).
+    """
     with get_db_connection() as conn:
         cursor = conn.cursor()
         query = "SELECT DISTINCT i.* FROM invoices i"
@@ -552,7 +558,8 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
             data.setdefault("voided_at", "")
             payload = {k: data[k] for k in data if k in fields and k != "items"}
             inv = Invoice(**payload, items=[])
-            cursor.execute('SELECT * FROM invoice_items WHERE invoice_id = ?', (inv.id,))
-            inv.items = [_invoice_item_from_row(cursor, i) for i in cursor.fetchall()]
+            if include_items:
+                cursor.execute('SELECT * FROM invoice_items WHERE invoice_id = ?', (inv.id,))
+                inv.items = [_invoice_item_from_row(cursor, i) for i in cursor.fetchall()]
             invoices.append(inv)
         return invoices

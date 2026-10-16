@@ -2,6 +2,15 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.14] — 2026-10-16
+
+### Fixes
+
+- **Show totals** restores the summary cards correctly (no empty gray strip)
+- Long Sales History ranges (45+ days / multi-month) load and export without pulling every invoice line item first
+
+---
+
 ## [1.6.13] — 2026-10-16
 
 ### Fixes
