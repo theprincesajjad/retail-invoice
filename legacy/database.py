@@ -279,34 +279,41 @@ def delete_product(product_id: int):
         cursor.execute('DELETE FROM products WHERE id = ?', (product_id,))
         conn.commit()
 
-def search_products(query="", category=None):
-    """Search products by name/SKU/details, optionally limited to one category.
+def search_products(query="", category=None, stock=None):
+    """Search products by name/SKU/details, optionally by category and stock.
 
     ``category`` None / empty / \"All categories\" means no category filter.
+    ``stock``:
+      - None / \"all\" / \"all items\" — no stock filter
+      - \"in_stock\" / \"in stock only\" — qty > 0
+      - \"out_of_stock\" / \"out of stock only\" — qty <= 0
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
         search_query = f"%{query}%"
+        conditions = [
+            "(name LIKE ? OR serial_number LIKE ? OR sku LIKE ? OR IFNULL(category,'') LIKE ?)"
+        ]
+        params: list = [search_query, search_query, search_query, search_query]
+
         cat = (category or "").strip()
         if cat and cat.lower() not in ("all categories", "all", "select category"):
-            cursor.execute(
-                """
-                SELECT * FROM products
-                WHERE (name LIKE ? OR serial_number LIKE ? OR sku LIKE ? OR IFNULL(category,'') LIKE ?)
-                  AND IFNULL(category,'') = ?
-                ORDER BY category, name
-                """,
-                (search_query, search_query, search_query, search_query, cat),
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT * FROM products
-                WHERE name LIKE ? OR serial_number LIKE ? OR sku LIKE ? OR IFNULL(category,'') LIKE ?
-                ORDER BY category, name
-                """,
-                (search_query, search_query, search_query, search_query),
-            )
+            conditions.append("IFNULL(category,'') = ?")
+            params.append(cat)
+
+        stock_key = (stock or "").strip().lower().replace("-", " ").replace("_", " ")
+        if stock_key in ("in stock", "in stock only", "instock"):
+            conditions.append("qty > 0")
+        elif stock_key in ("out of stock", "out of stock only", "outofstock"):
+            conditions.append("qty <= 0")
+        # else: all items — no stock clause
+
+        sql = (
+            "SELECT * FROM products WHERE "
+            + " AND ".join(conditions)
+            + " ORDER BY category, name"
+        )
+        cursor.execute(sql, params)
         rows = cursor.fetchall()
         return [_product_from_row(row) for row in rows]
 

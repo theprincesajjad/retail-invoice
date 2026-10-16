@@ -123,7 +123,18 @@ class InventoryTab(ctk.CTkFrame):
         self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 12))
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_products())
 
-        T.field_label(inner, "Category").grid(row=0, column=2, sticky="w", padx=(0, 8))
+        T.field_label(inner, "Stock").grid(row=0, column=2, sticky="w", padx=(0, 8))
+        self.stock_filter_var = ctk.StringVar(value="In stock only")
+        self.stock_filter = ctk.CTkComboBox(
+            inner,
+            variable=self.stock_filter_var,
+            values=["In stock only", "Out of stock only", "All items"],
+            command=lambda *_: self.load_products(),
+            **T.combo_kwargs(150),
+        )
+        self.stock_filter.grid(row=0, column=3, sticky="w", padx=(0, 12))
+
+        T.field_label(inner, "Category").grid(row=0, column=4, sticky="w", padx=(0, 8))
         self.category_filter_var = ctk.StringVar(value="All categories")
         self.category_filter = ctk.CTkComboBox(
             inner,
@@ -132,7 +143,7 @@ class InventoryTab(ctk.CTkFrame):
             command=lambda *_: self.load_products(),
             **T.combo_kwargs(160),
         )
-        self.category_filter.grid(row=0, column=3, sticky="e")
+        self.category_filter.grid(row=0, column=5, sticky="e")
 
     def export_products_csv(self):
         """Export full inventory to CSV (SKU, name, details, qty, price, category, date stamp)."""
@@ -237,6 +248,14 @@ class InventoryTab(ctk.CTkFrame):
         if not cat or cat == "All categories":
             return None
         return cat
+
+    def _selected_stock_filter(self) -> str | None:
+        if not hasattr(self, "stock_filter_var"):
+            return None
+        stock = (self.stock_filter_var.get() or "").strip()
+        if not stock or stock == "All items":
+            return None
+        return stock
 
     def choose_inventory_excel(self):
         """Pick or create the local inventory Excel workbook used for Sync."""
@@ -394,15 +413,20 @@ class InventoryTab(ctk.CTkFrame):
         products = search_products(
             self.search_var.get().strip(),
             category=self._selected_category_filter(),
+            stock=self._selected_stock_filter(),
         )
 
         if not products:
             cat = self._selected_category_filter()
-            empty_msg = (
-                f"No products in {cat} — try another category or clear the search"
-                if cat
-                else "No products yet — click \"Add new product\" to get started"
-            )
+            stock = self._selected_stock_filter()
+            if stock and cat:
+                empty_msg = f"No {stock.lower()} in {cat} — try another filter"
+            elif stock:
+                empty_msg = f"No {stock.lower()} — try All items or another category"
+            elif cat:
+                empty_msg = f"No products in {cat} — try another category or clear the search"
+            else:
+                empty_msg = "No products yet — click \"Add new product\" to get started"
             ctk.CTkLabel(
                 self.rows_frame,
                 text=empty_msg,
