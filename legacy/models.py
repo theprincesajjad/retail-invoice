@@ -12,7 +12,9 @@ class Product:
     price: float
     qty: int
     category: str
-    created_at: str
+    created_at: str = ""
+    import_date: str = ""
+    sold_date: str = ""
 
 @dataclass
 class InvoiceItem:
@@ -44,3 +46,5 @@ class Invoice:
     discount_amount: float = 0.0
     discount_timing: str = "before_tax"  # "before_tax" or "after_tax"
     customer_email: str = ""
+    voided: int = 0
+    voided_at: str = ""
