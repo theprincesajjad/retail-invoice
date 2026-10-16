@@ -22,7 +22,6 @@ from database import (
     delete_product,
     search_products,
     list_all_products,
-    reapply_sku_prefix_categories,
     get_setting,
     save_setting,
 )
@@ -104,15 +103,8 @@ class InventoryTab(ctk.CTkFrame):
             **T.button_kwargs(width=170),
         ).pack(side="left", padx=(10, 0))
 
-        ctk.CTkButton(
-            inner,
-            text="Apply SKU categories",
-            command=self.apply_sku_categories,
-            **T.button_kwargs(width=160),
-        ).pack(side="left", padx=(10, 0))
-
     def create_search_bar(self):
-        """Full-width search on its own row (replaces the old low-stock banner space)."""
+        """Full-width search + category filter (limits list/search to one category)."""
         bar = ctk.CTkFrame(self, **T.card_kwargs())
         bar.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
 
@@ -125,11 +117,22 @@ class InventoryTab(ctk.CTkFrame):
         self.search_entry = ctk.CTkEntry(
             inner,
             textvariable=self.search_var,
-            placeholder_text="Name, SKU / code, category, or details…",
+            placeholder_text="Name, SKU / code, or details…",
             **T.entry_kwargs(),
         )
-        self.search_entry.grid(row=0, column=1, sticky="ew")
+        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 12))
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_products())
+
+        T.field_label(inner, "Category").grid(row=0, column=2, sticky="w", padx=(0, 8))
+        self.category_filter_var = ctk.StringVar(value="All categories")
+        self.category_filter = ctk.CTkComboBox(
+            inner,
+            variable=self.category_filter_var,
+            values=["All categories", *PRODUCT_CATEGORIES],
+            command=lambda *_: self.load_products(),
+            **T.combo_kwargs(160),
+        )
+        self.category_filter.grid(row=0, column=3, sticky="e")
 
     def export_products_csv(self):
         """Export full inventory to CSV (SKU, name, details, qty, price, category, date stamp)."""
@@ -227,16 +230,13 @@ class InventoryTab(ctk.CTkFrame):
                 parent=self.winfo_toplevel(),
             )
 
-    def apply_sku_categories(self):
-        """Batch: SKU 92* → Laptops, SKU 110* → Cell Phones."""
-        n = reapply_sku_prefix_categories()
-        self.load_products()
-        toast(
-            self,
-            f"Updated categories · 92→Laptops, 110→Cell Phones ({n} rows)",
-            kind="success",
-        )
-        self.winfo_toplevel().set_status("SKU category rules applied")
+    def _selected_category_filter(self) -> str | None:
+        if not hasattr(self, "category_filter_var"):
+            return None
+        cat = (self.category_filter_var.get() or "").strip()
+        if not cat or cat == "All categories":
+            return None
+        return cat
 
     def choose_inventory_excel(self):
         """Pick or create the local inventory Excel workbook used for Sync."""
@@ -391,12 +391,21 @@ class InventoryTab(ctk.CTkFrame):
         for widget in self.rows_frame.winfo_children():
             widget.destroy()
 
-        products = search_products(self.search_var.get().strip())
+        products = search_products(
+            self.search_var.get().strip(),
+            category=self._selected_category_filter(),
+        )
 
         if not products:
+            cat = self._selected_category_filter()
+            empty_msg = (
+                f"No products in {cat} — try another category or clear the search"
+                if cat
+                else "No products yet — click \"Add new product\" to get started"
+            )
             ctk.CTkLabel(
                 self.rows_frame,
-                text="No products yet — click \"Add new product\" to get started",
+                text=empty_msg,
                 font=T.FONT, text_color=T.TEXT_TERTIARY,
             ).pack(pady=40)
             return

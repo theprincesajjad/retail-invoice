@@ -1,7 +1,12 @@
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 from database import search_invoices
-from utils import format_currency, parse_report_date
+from utils import (
+    current_quarter_label,
+    format_currency,
+    parse_report_date,
+    quarter_date_range,
+)
 from datetime import datetime, timedelta
 import calendar
 from pathlib import Path
@@ -103,7 +108,7 @@ class ReportsTab(ctk.CTkFrame):
         self.totals_toggle_btn.pack(side="left", padx=(0, 12))
         ctk.CTkLabel(
             bottom,
-            text="From/To drive the list and exports (YYYY-MM-DD or MM/DD/YYYY).",
+            text="Presets or Apply dates set the range for list + Export PDF / Monthly totals.",
             font=T.FONT_SMALL,
             text_color=T.TEXT_TERTIARY,
         ).pack(side="left")
@@ -243,7 +248,8 @@ class ReportsTab(ctk.CTkFrame):
             self.range_combo.configure(state="normal")
             values = [f"Q{q} {year}" for q in range(1, 5)] + [f"Q{q} {year - 1}" for q in range(1, 5)]
             self.range_combo.configure(values=values)
-            self.range_var.set(values[0])
+            # Default to the current quarter (not always Q1)
+            self.range_var.set(current_quarter_label(now))
         elif period == "Custom dates":
             self.range_combo.configure(state="disabled")
             self.range_combo.configure(values=["Custom"])
@@ -300,12 +306,7 @@ class ReportsTab(ctk.CTkFrame):
                 _, last_day = calendar.monthrange(dt.year, dt.month)
                 end_date = dt.strftime(f"%Y-%m-{last_day} 23:59:59")
             elif period == "Quarterly":
-                q, y = rng.split()
-                y = int(y)
-                sm, em = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}[int(q[1])]
-                start_date = f"{y}-{sm:02d}-01 00:00:00"
-                _, ld = calendar.monthrange(y, em)
-                end_date = f"{y}-{em:02d}-{ld} 23:59:59"
+                start_date, end_date = quarter_date_range(rng)
             elif period == "Yearly":
                 start_date = f"{rng}-01-01 00:00:00"
                 end_date = f"{rng}-12-31 23:59:59"
@@ -322,14 +323,26 @@ class ReportsTab(ctk.CTkFrame):
         """
         Active filter range for the list and PDF exports.
 
-        From/To are the source of truth whenever both parse — so a 3-month
-        manual range works for browse + Export PDF + Monthly totals.
+        Time period presets (Today / Monthly / Quarterly / …) drive the range
+        from Specific. Custom dates / Apply dates use the From/To fields so
+        multi-month manual ranges still work for Export PDF and Monthly totals.
         """
+        period = self.period_var.get()
+        if period == "Custom dates":
+            start_date = parse_report_date(self.from_date_var.get(), end_of_day=False)
+            end_date = parse_report_date(self.to_date_var.get(), end_of_day=True)
+            if start_date and end_date:
+                return self._normalize_range(start_date, end_date)
+            return None, None
+        start_date, end_date = self._date_range_from_period()
+        if start_date and end_date:
+            return start_date, end_date
+        # Fallback if Specific failed to parse — still honor typed From/To
         start_date = parse_report_date(self.from_date_var.get(), end_of_day=False)
         end_date = parse_report_date(self.to_date_var.get(), end_of_day=True)
         if start_date and end_date:
             return self._normalize_range(start_date, end_date)
-        return self._date_range_from_period()
+        return None, None
 
     def _period_label(self) -> str:
         start_date, end_date = self.get_date_range()
@@ -521,8 +534,19 @@ class ReportsTab(ctk.CTkFrame):
         return active, start_date, end_date
 
     def _ask_pdf_path(self, title: str, default_name: str) -> str | None:
+        root = self.winfo_toplevel()
+        # Keep the save dialog above the CustomTkinter window (otherwise it can
+        # open behind the app and look like Export / Monthly totals "does nothing").
+        try:
+            root.lift()
+            root.focus_force()
+            root.attributes("-topmost", True)
+            root.update_idletasks()
+            root.after(150, lambda: root.attributes("-topmost", False))
+        except Exception:
+            pass
         path = filedialog.asksaveasfilename(
-            parent=self.winfo_toplevel(),
+            parent=root,
             title=title,
             defaultextension=".pdf",
             filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
@@ -542,10 +566,19 @@ class ReportsTab(ctk.CTkFrame):
             messagebox.showerror("PDF export failed", str(e))
             return
         if not start_date or not end_date:
-            toast(self, "Set valid From and To dates first.", kind="warning")
+            toast(self, "Choose a time period or set valid From/To dates first.", kind="warning")
+            messagebox.showwarning(
+                "Choose a date range",
+                "Select Today / Monthly / Quarterly (or enter From/To and Apply dates), then try Export PDF again.",
+            )
             return
         if not invoices:
-            toast(self, "No sales in this date range to export.", kind="warning")
+            label = self._period_label()
+            toast(self, f"No sales for {label}.", kind="warning")
+            messagebox.showwarning(
+                "Nothing to export",
+                f"No sales found for {label}.\n\nPick a Specific quarter/month that has sales, or widen From/To.",
+            )
             return
         period = self._period_label()
         stamp = datetime.now().strftime("%Y%m%d")
@@ -575,10 +608,19 @@ class ReportsTab(ctk.CTkFrame):
             messagebox.showerror("PDF export failed", str(e))
             return
         if not start_date or not end_date:
-            toast(self, "Set valid From and To dates first.", kind="warning")
+            toast(self, "Choose a time period or set valid From/To dates first.", kind="warning")
+            messagebox.showwarning(
+                "Choose a date range",
+                "Select Today / Monthly / Quarterly (or enter From/To and Apply dates), then try Monthly totals again.",
+            )
             return
         if not invoices:
-            toast(self, "No sales in this date range to export.", kind="warning")
+            label = self._period_label()
+            toast(self, f"No sales for {label}.", kind="warning")
+            messagebox.showwarning(
+                "Nothing to export",
+                f"No sales found for {label}.\n\nPick a Specific quarter/month that has sales, or widen From/To.",
+            )
             return
         period = self._period_label()
         stamp = datetime.now().strftime("%Y%m%d")

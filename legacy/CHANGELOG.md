@@ -2,6 +2,25 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.15] — 2026-10-16
+
+### Fixes
+
+- **Quarterly** Sales History defaults to the current quarter (not always Q1)
+- Time period presets drive **Export PDF** / **Monthly totals** (Custom dates still use From/To)
+- Save-dialog brought to the front so export buttons no longer look like they “do nothing”
+- Clearer warning when the selected range has no sales to export
+
+### Products
+
+- **Category** dropdown filters the product list/search (replaces **Apply SKU categories**)
+
+### New Sale
+
+- Line list shows **SKU** between **#** and **Item**
+
+---
+
 ## [1.6.14] — 2026-10-16
 
 ### Fixes
@@ -131,7 +150,7 @@ All notable changes to Retail Invoice are documented here.
 - **Export CSV / Import CSV** — full inventory round-trip with Category + Date Stamp
 - Import **only blank Date Stamp** rows, then stamps today’s date
 - **Category pulldown** — Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets
-- **SKU batch categories** — `92*` → Laptops, `110*` → Cell Phones (on first open; **Apply SKU categories** to re-run)
+- **SKU batch categories** — `92*` → Laptops, `110*` → Cell Phones (applied once on first open)
 - Category + Date columns on the Products list
 - **Export checklist PDF** (in-stock only) from 1.6.1
 
