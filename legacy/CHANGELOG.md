@@ -2,6 +2,19 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.12] — 2026-10-16
+
+### Products
+
+- Search field moved to a full-width second row; low-stock warning banner removed for typing space
+
+### Receipts & Sales History
+
+- Printed / emailed / preview receipts show **SKU** under each inventory line item
+- Sales History search finds sales by product **SKU** (and receipt number)
+
+---
+
 ## [1.6.11] — 2026-10-16
 
 ### Sales History

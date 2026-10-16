@@ -393,6 +393,7 @@ class InvoiceTab(ctk.CTkFrame):
             id=None, invoice_id=None, product_id=p.id,
             description=p.name, serial_number=details,
             qty=qty, unit_price=p.price, line_total=qty * p.price,
+            sku=p.sku or "",
         ))
         self.refresh_items()
         self.search_var.set("")
@@ -501,6 +502,7 @@ class InvoiceTab(ctk.CTkFrame):
                 qty=it.qty,
                 unit_price=it.unit_price,
                 line_total=it.line_total,
+                sku=getattr(it, "sku", "") or "",
             )
             for it in (invoice.items or [])
         ]

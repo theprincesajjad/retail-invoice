@@ -44,7 +44,7 @@ class InventoryTab(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
 
         self.create_top_bar()
-        self.create_low_stock_banner()
+        self.create_search_bar()
         self.create_table()
         self.load_products()
 
@@ -111,13 +111,24 @@ class InventoryTab(ctk.CTkFrame):
             **T.button_kwargs(width=160),
         ).pack(side="left", padx=(10, 0))
 
-        T.field_label(inner, "Search products").pack(side="left", padx=(24, 8))
+    def create_search_bar(self):
+        """Full-width search on its own row (replaces the old low-stock banner space)."""
+        bar = ctk.CTkFrame(self, **T.card_kwargs())
+        bar.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
+
+        inner = ctk.CTkFrame(bar, fg_color="transparent")
+        inner.pack(fill="x", padx=T.PAD_CARD, pady=12)
+        inner.grid_columnconfigure(1, weight=1)
+
+        T.field_label(inner, "Search products").grid(row=0, column=0, sticky="w", padx=(0, 12))
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
-            inner, textvariable=self.search_var,
-            placeholder_text="Name, code, category, or details…", **T.entry_kwargs(280),
+            inner,
+            textvariable=self.search_var,
+            placeholder_text="Name, SKU / code, category, or details…",
+            **T.entry_kwargs(),
         )
-        self.search_entry.pack(side="left")
+        self.search_entry.grid(row=0, column=1, sticky="ew")
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_products())
 
     def export_products_csv(self):
@@ -356,15 +367,6 @@ class InventoryTab(ctk.CTkFrame):
                 parent=self.winfo_toplevel(),
             )
 
-    def create_low_stock_banner(self):
-        self.banner_frame = ctk.CTkFrame(self, fg_color=T.WARNING_SOFT, corner_radius=T.RADIUS_MD)
-        self.banner_frame.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
-        self.banner_label = ctk.CTkLabel(
-            self.banner_frame, text="", font=T.FONT, text_color=T.WARNING, anchor="w",
-        )
-        self.banner_label.pack(fill="x", padx=T.PAD_CARD, pady=12)
-        self.banner_frame.grid_remove()
-
     def create_table(self):
         card = ctk.CTkFrame(self, **T.card_kwargs())
         card.grid(row=2, column=0, sticky="nsew", padx=4, pady=(0, 4))
@@ -390,15 +392,6 @@ class InventoryTab(ctk.CTkFrame):
             widget.destroy()
 
         products = search_products(self.search_var.get().strip())
-
-        low_stock = [p for p in products if 0 < p.qty <= self.LOW_STOCK_THRESHOLD]
-        if low_stock:
-            names = ", ".join(p.name for p in low_stock[:3])
-            extra = f" and {len(low_stock) - 3} more" if len(low_stock) > 3 else ""
-            self.banner_label.configure(text=f"Low stock warning: {names}{extra}")
-            self.banner_frame.grid()
-        else:
-            self.banner_frame.grid_remove()
 
         if not products:
             ctk.CTkLabel(

@@ -26,6 +26,7 @@ class InvoiceItem:
     qty: int
     unit_price: float
     line_total: float
+    sku: str = ""
 
 @dataclass
 class Invoice:

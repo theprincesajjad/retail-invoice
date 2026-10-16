@@ -58,7 +58,7 @@ class ReportsTab(ctk.CTkFrame):
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(
             top, textvariable=self.search_var,
-            placeholder_text="Customer name, phone, or product…", **T.entry_kwargs(220),
+            placeholder_text="Customer, phone, product, or SKU…", **T.entry_kwargs(220),
         )
         self.search_entry.pack(side="left", padx=(0, 10))
         self.search_entry.bind("<KeyRelease>", lambda e: self.load_invoices())

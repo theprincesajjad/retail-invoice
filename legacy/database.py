@@ -51,6 +51,7 @@ def init_db():
                 qty INTEGER NOT NULL,
                 unit_price REAL NOT NULL,
                 line_total REAL NOT NULL,
+                sku TEXT DEFAULT '',
                 FOREIGN KEY(invoice_id) REFERENCES invoices(id),
                 FOREIGN KEY(product_id) REFERENCES products(id)
             )
@@ -90,6 +91,7 @@ def _migrate_schema(conn):
         "ALTER TABLE invoices ADD COLUMN voided_at TEXT DEFAULT ''",
         "ALTER TABLE products ADD COLUMN import_date TEXT DEFAULT ''",
         "ALTER TABLE products ADD COLUMN sold_date TEXT DEFAULT ''",
+        "ALTER TABLE invoice_items ADD COLUMN sku TEXT DEFAULT ''",
     ):
         try:
             cursor.execute(sql)
@@ -343,15 +345,40 @@ def save_invoice(invoice: Invoice, items: list[InvoiceItem]):
         return invoice_id
 
 
+def _resolve_item_sku(cursor, product_id, stored_sku: str = "") -> str:
+    sku = (stored_sku or "").strip()
+    if sku:
+        return sku
+    if not product_id:
+        return ""
+    cursor.execute("SELECT sku FROM products WHERE id = ?", (product_id,))
+    row = cursor.fetchone()
+    if not row:
+        return ""
+    return (row["sku"] if isinstance(row, sqlite3.Row) else row[0]) or ""
+
+
+def _invoice_item_from_row(cursor, row) -> InvoiceItem:
+    idata = dict(row)
+    idata.setdefault("sku", "")
+    idata["sku"] = _resolve_item_sku(cursor, idata.get("product_id"), idata.get("sku") or "")
+    item_fields = InvoiceItem.__dataclass_fields__
+    return InvoiceItem(**{k: idata[k] for k in idata if k in item_fields})
+
+
 def _insert_invoice_items(cursor, invoice_id: int, items: list[InvoiceItem], *, adjust_stock: bool):
     touched: set[int] = set()
     for item in items:
+        sku = (getattr(item, "sku", "") or "").strip()
+        if not sku and item.product_id:
+            sku = _resolve_item_sku(cursor, item.product_id, "")
+            item.sku = sku
         cursor.execute('''
-            INSERT INTO invoice_items (invoice_id, product_id, description, serial_number, qty, unit_price, line_total)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO invoice_items (invoice_id, product_id, description, serial_number, qty, unit_price, line_total, sku)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             invoice_id, item.product_id, item.description, item.serial_number,
-            item.qty, item.unit_price, item.line_total,
+            item.qty, item.unit_price, item.line_total, sku,
         ))
         if adjust_stock and item.product_id:
             cursor.execute(
@@ -382,11 +409,7 @@ def get_invoice_by_id(invoice_id: int) -> Invoice | None:
         payload = {k: data[k] for k in data if k in fields and k != "items"}
         inv = Invoice(**payload, items=[])
         cursor.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice_id,))
-        item_fields = InvoiceItem.__dataclass_fields__
-        inv.items = []
-        for i in cursor.fetchall():
-            idata = dict(i)
-            inv.items.append(InvoiceItem(**{k: idata[k] for k in idata if k in item_fields}))
+        inv.items = [_invoice_item_from_row(cursor, i) for i in cursor.fetchall()]
         return inv
 
 
@@ -491,12 +514,19 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
         conditions = []
 
         if search_query.strip():
-            query += " LEFT JOIN invoice_items ii ON ii.invoice_id = i.id"
+            query += (
+                " LEFT JOIN invoice_items ii ON ii.invoice_id = i.id"
+                " LEFT JOIN products p ON p.id = ii.product_id"
+            )
             like = f"%{search_query.strip()}%"
             conditions.append(
-                "(i.customer_name LIKE ? OR i.customer_phone LIKE ? OR ii.description LIKE ? OR ii.serial_number LIKE ?)"
+                "("
+                "i.customer_name LIKE ? OR i.customer_phone LIKE ? OR i.invoice_number LIKE ? "
+                "OR ii.description LIKE ? OR ii.serial_number LIKE ? OR IFNULL(ii.sku,'') LIKE ? "
+                "OR IFNULL(p.sku,'') LIKE ?"
+                ")"
             )
-            params.extend([like, like, like, like])
+            params.extend([like, like, like, like, like, like, like])
 
         if start_date and end_date:
             conditions.append("i.created_at >= ? AND i.created_at <= ?")
@@ -511,7 +541,6 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
         rows = cursor.fetchall()
         invoices = []
         fields = Invoice.__dataclass_fields__
-        item_fields = InvoiceItem.__dataclass_fields__
         for row in rows:
             data = dict(row)
             data.setdefault("discount_type", "")
@@ -524,10 +553,6 @@ def _fetch_invoices(start_date=None, end_date=None, search_query=""):
             payload = {k: data[k] for k in data if k in fields and k != "items"}
             inv = Invoice(**payload, items=[])
             cursor.execute('SELECT * FROM invoice_items WHERE invoice_id = ?', (inv.id,))
-            item_rows = cursor.fetchall()
-            inv.items = [
-                InvoiceItem(**{k: dict(i)[k] for k in dict(i) if k in item_fields})
-                for i in item_rows
-            ]
+            inv.items = [_invoice_item_from_row(cursor, i) for i in cursor.fetchall()]
             invoices.append(inv)
         return invoices

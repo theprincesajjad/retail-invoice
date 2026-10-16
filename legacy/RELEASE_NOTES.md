@@ -1,16 +1,21 @@
-## Retail Invoice 1.6.11
+## Retail Invoice 1.6.12
 
-Download `RetailInvoice-1.6.11-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.12-Windows.exe`, double-click, and go.
 
-### Sales History
+### Products
 
-- Period totals (money / tax / count / average) are **hidden by default**
-- Tap **Show totals** when you want them; **Hide totals** to conceal them again while browsing with a customer
+- **Search** sits on its own full-width second row (more room to type)
+- Low-stock warning banner removed to free that space (qty still shows “low” in the list)
+
+### Receipts & Sales History
+
+- Printed receipts show **SKU:** under each inventory line
+- Sales History search matches **SKU** (and receipt #) so you can find when an item was sold
 
 ### Also recent
 
+- 1.6.11: Sales totals hidden until Show totals
 - 1.6.10: Excel sync sorted by category + SKU with gaps
-- 1.6.9: Sync Excel inventory (Status + date sold)
 
 ### Requirements
 
