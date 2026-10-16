@@ -216,6 +216,10 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
         )
         for extra in desc_lines[1:]:
             lines.append(_format_item_cont(extra, w_desc, w_qty, w_unit, w_total))
+        sku = (getattr(item, "sku", "") or "").strip()
+        if sku:
+            for sku_line in _wrap_text(f"SKU: {sku}", w_desc):
+                lines.append(_format_item_cont(sku_line, w_desc, w_qty, w_unit, w_total))
         if item.serial_number and _on(settings, "receipt_show_details", "1"):
             for detail_line in _wrap_text(f"Details: {item.serial_number}", w_desc):
                 lines.append(_format_item_cont(detail_line, w_desc, w_qty, w_unit, w_total))
@@ -298,12 +302,14 @@ def sample_receipt_invoice(settings: dict | None = None) -> tuple[Invoice, list[
             description="Dell Latitude Laptop",
             serial_number="i5 8250U 32GB / 512GB / 15.6 / Win 11",
             qty=1, unit_price=699.99, line_total=699.99,
+            sku="92001",
         ),
         InvoiceItem(
             id=None, invoice_id=None, product_id=None,
             description="Case",
             serial_number="",
             qty=1, unit_price=15.00, line_total=15.00,
+            sku="",
         ),
     ]
     subtotal = sum(i.line_total for i in items)
