@@ -120,6 +120,31 @@ def test_search_products_category_filter(db):
     assert len(db.search_products("", category=None)) == 3
 
 
+def test_search_products_stock_filter(db):
+    db.add_product(Product(None, "In Stock Laptop", "", "92001", 500.0, 2, "Laptops"))
+    db.add_product(Product(None, "Sold Phone", "", "110001", 400.0, 0, "Cell Phones"))
+    db.add_product(Product(None, "Also Sold", "", "80001", 300.0, 0, "Desktops"))
+
+    assert len(db.search_products("", stock="All items")) == 3
+    assert len(db.search_products("", stock=None)) == 3
+
+    in_stock = db.search_products("", stock="In stock only")
+    assert len(in_stock) == 1
+    assert in_stock[0].sku == "92001"
+
+    out = db.search_products("", stock="Out of stock only")
+    assert len(out) == 2
+    assert {p.sku for p in out} == {"110001", "80001"}
+
+    # Stock + category together
+    sold_phones = db.search_products(
+        "", category="Cell Phones", stock="Out of stock only"
+    )
+    assert len(sold_phones) == 1
+    assert sold_phones[0].name == "Sold Phone"
+    assert db.search_products("", category="Laptops", stock="Out of stock only") == []
+
+
 def test_custom_from_to_still_parses_for_multi_month():
     start = parse_report_date("2026-07-01")
     end = parse_report_date("2026-09-30", end_of_day=True)

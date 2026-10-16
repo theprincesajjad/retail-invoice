@@ -2,6 +2,14 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.16] — 2026-10-16
+
+### Products
+
+- **Stock** dropdown between Search and Category: **In stock only**, **Out of stock only**, or **All items** (defaults to in stock)
+
+---
+
 ## [1.6.15] — 2026-10-16
 
 ### Fixes
