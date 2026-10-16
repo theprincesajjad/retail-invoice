@@ -1,16 +1,16 @@
-## Retail Invoice 1.6.10
+## Retail Invoice 1.6.11
 
-Download `RetailInvoice-1.6.10-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.11-Windows.exe`, double-click, and go.
 
-### Products / Excel sync
+### Sales History
 
-- Inventory Excel is organized by **Category**, then **SKU low → high**
-- **Blank rows** between categories so you can type in new items before the next Sync
+- Period totals (money / tax / count / average) are **hidden by default**
+- Tap **Show totals** when you want them; **Hide totals** to conceal them again while browsing with a customer
 
 ### Also recent
 
+- 1.6.10: Excel sync sorted by category + SKU with gaps
 - 1.6.9: Sync Excel inventory (Status + date sold)
-- 1.6.8: Custom sales date range + monthly totals PDF
 
 ### Requirements
 
