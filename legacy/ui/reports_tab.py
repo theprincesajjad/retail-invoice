@@ -17,10 +17,12 @@ class ReportsTab(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._current_invoices = []
+        self._totals_visible = False  # privacy: hide period totals until asked
 
         self.create_filters()
         self.create_summary()
         self.create_table()
+        self._apply_totals_visibility()
 
         self.period_var.set("Today")
         self.on_filter_change()
@@ -69,7 +71,11 @@ class ReportsTab(ctk.CTkFrame):
         ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
             top, text="Monthly totals", command=self.export_monthly_totals_pdf, **T.button_kwargs(width=130),
-        ).pack(side="left")
+        ).pack(side="left", padx=(0, 8))
+        self.totals_toggle_btn = ctk.CTkButton(
+            top, text="Show totals", command=self.toggle_totals, **T.button_kwargs(width=120),
+        )
+        self.totals_toggle_btn.pack(side="left")
 
         bottom = ctk.CTkFrame(card, fg_color="transparent")
         bottom.pack(fill="x", padx=T.PAD_CARD, pady=(0, 14))
@@ -112,6 +118,23 @@ class ReportsTab(ctk.CTkFrame):
         self.range_combo.configure(values=["Custom"])
         self.range_var.set("Custom")
         self.load_invoices()
+
+    def toggle_totals(self):
+        """Show or hide period summary totals (privacy when browsing with a customer)."""
+        self._totals_visible = not self._totals_visible
+        self._apply_totals_visibility()
+
+    def _apply_totals_visibility(self):
+        if not hasattr(self, "summary_frame"):
+            return
+        if self._totals_visible:
+            self.summary_frame.grid()
+            if hasattr(self, "totals_toggle_btn"):
+                self.totals_toggle_btn.configure(text="Hide totals")
+        else:
+            self.summary_frame.grid_remove()
+            if hasattr(self, "totals_toggle_btn"):
+                self.totals_toggle_btn.configure(text="Show totals")
 
     def create_summary(self):
         self.summary_frame = ctk.CTkFrame(self, fg_color="transparent")

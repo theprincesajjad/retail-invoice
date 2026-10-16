@@ -2,6 +2,14 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.11] — 2026-10-16
+
+### Sales History
+
+- Period summary totals hidden by default; **Show totals** / **Hide totals** toggle for privacy when browsing invoices with a customer
+
+---
+
 ## [1.6.10] — 2026-09-14
 
 ### Products / Excel sync
