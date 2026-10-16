@@ -1,21 +1,17 @@
-## Retail Invoice 1.6.12
+## Retail Invoice 1.6.13
 
-Download `RetailInvoice-1.6.12-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.13-Windows.exe`, double-click, and go.
 
-### Products
+### Fixes
 
-- **Search** sits on its own full-width second row (more room to type)
-- Low-stock warning banner removed to free that space (qty still shows “low” in the list)
-
-### Receipts & Sales History
-
-- Printed receipts show **SKU:** under each inventory line
-- Sales History search matches **SKU** (and receipt #) so you can find when an item was sold
+- **Sales History From/To** now drive the list and PDF exports — set a 3‑month (or any) range, Apply dates / Refresh, then Export PDF or Monthly totals
+- **View / Print / Email** reload the sale from the database so receipts open reliably for sales in the selected range
+- Export buttons sit on the date row so they stay reachable
 
 ### Also recent
 
+- 1.6.12: Products search row + SKU on receipts / search
 - 1.6.11: Sales totals hidden until Show totals
-- 1.6.10: Excel sync sorted by category + SKU with gaps
 
 ### Requirements
 

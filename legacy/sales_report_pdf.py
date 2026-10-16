@@ -18,7 +18,7 @@ from utils import format_currency
 def aggregate_monthly_totals(invoices: list[Invoice]) -> list[dict[str, Any]]:
     """Group non-voided invoices by calendar month.
 
-    Returns rows sorted oldest→newest with keys:
+    Returns rows sorted oldesttonewest with keys:
     month_key (YYYY-MM), month_label (e.g. Sep 2026), invoices, revenue, tax, subtotal.
     """
     buckets: dict[str, dict[str, Any]] = {}
@@ -92,7 +92,7 @@ def build_monthly_totals_pdf(
     c.drawString(
         margin_x,
         y,
-        f"Printed {today}  ·  {' · '.join(range_bits) if range_bits else 'Selected period'}",
+        f"Printed {today}  -  {' - '.join(range_bits) if range_bits else 'Selected period'}",
     )
     c.setFillColorRGB(0, 0, 0)
     y -= 20
@@ -152,7 +152,7 @@ def build_monthly_totals_pdf(
     c.drawString(
         margin_x,
         y,
-        f"{len(rows)} {month_word}  ·  voided sales excluded",
+        f"{len(rows)} {month_word}  -  voided sales excluded",
     )
 
     c.save()
@@ -198,7 +198,7 @@ def build_sales_report_pdf(
         range_bits.append(f"From {start_date[:10]}")
     if end_date:
         range_bits.append(f"to {end_date[:10]}")
-    c.drawString(margin_x, y, f"Printed {today}  ·  {' · '.join(range_bits) if range_bits else 'All listed sales'}")
+    c.drawString(margin_x, y, f"Printed {today}  -  {' - '.join(range_bits) if range_bits else 'All listed sales'}")
     c.setFillColorRGB(0, 0, 0)
     y -= 18
 
@@ -261,7 +261,7 @@ def build_sales_report_pdf(
     y -= 14
     c.setFont("Helvetica", 8)
     c.setFillColorRGB(0.4, 0.4, 0.4)
-    c.drawString(margin_x, y, f"Tax collected {format_currency(total_tax)}  ·  Subtotal {format_currency(total_sub)}")
+    c.drawString(margin_x, y, f"Tax collected {format_currency(total_tax)}  -  Subtotal {format_currency(total_sub)}")
 
     c.save()
     return buffer.getvalue()

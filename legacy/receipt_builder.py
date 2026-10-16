@@ -229,7 +229,10 @@ def build_receipt_text(invoice: Invoice, items: list[InvoiceItem], settings: dic
     lines.append(single)
     lines.append(blank)
 
-    tax_pct = int(invoice.tax_rate * 100)
+    try:
+        tax_pct = int(round(float(invoice.tax_rate or 0) * 100))
+    except (TypeError, ValueError):
+        tax_pct = 0
 
     def money_row(label: str, amount: float) -> str:
         value = format_currency(amount)

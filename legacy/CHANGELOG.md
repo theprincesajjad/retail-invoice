@@ -2,6 +2,16 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.13] — 2026-10-16
+
+### Fixes
+
+- Sales History **From/To dates** are the source of truth for the list and **Export PDF / Monthly totals** (multi-month ranges work)
+- **View / Print / Email** reload the invoice from the database so receipts open for filtered sales
+- Export controls moved onto the date row; clearer errors when the range is empty or invalid
+
+---
+
 ## [1.6.12] — 2026-10-16
 
 ### Products
