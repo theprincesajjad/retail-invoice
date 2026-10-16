@@ -218,6 +218,8 @@ def success_button_kwargs(**extra):
 
 
 def danger_button_kwargs(**extra):
+    # Do not bake in width — callers often pass width=… to CTkButton as well,
+    # and CustomTkinter raises if width is supplied twice.
     return _merge(
         {
             "fg_color": DANGER_SOFT,
@@ -227,7 +229,6 @@ def danger_button_kwargs(**extra):
             "corner_radius": RADIUS_SM,
             "font": FONT_MEDIUM,
             "height": BTN_HEIGHT_SM,
-            "width": BTN_HEIGHT_SM,
         },
         **extra,
     )

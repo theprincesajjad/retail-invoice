@@ -7,7 +7,21 @@ from . import theme as T
 from .toast import toast
 
 
+def _created_at_label(created_at) -> str:
+    if not created_at:
+        return ""
+    text = str(created_at)
+    return text[:16]
+
+
 def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_preview: bool = False):
+    items = list(items or [])
+    try:
+        receipt = build_receipt_text(invoice, items)
+    except Exception as e:
+        messagebox.showerror("Could not open receipt", str(e), parent=parent)
+        return
+
     dialog = ctk.CTkToplevel(parent)
     title = "Receipt Preview" if is_preview else f"Receipt — {invoice.invoice_number}"
     dialog.title(title)
@@ -15,7 +29,6 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_p
     dialog.minsize(420, 560)
     dialog.configure(fg_color=T.BG)
     dialog.transient(parent)
-    dialog.grab_set()
 
     card = ctk.CTkFrame(dialog, **T.card_kwargs())
     card.pack(fill="both", expand=True, padx=24, pady=24)
@@ -31,7 +44,7 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_p
     else:
         ctk.CTkLabel(
             header,
-            text=f"{invoice.invoice_number}  ·  {invoice.created_at[:16] if invoice.created_at else ''}",
+            text=f"{invoice.invoice_number}  ·  {_created_at_label(invoice.created_at)}",
             font=T.FONT_CAPTION, text_color=T.TEXT_SECONDARY,
         ).pack(anchor="w", pady=(4, 0))
 
@@ -43,7 +56,6 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_p
     receipt_frame = ctk.CTkFrame(card, fg_color="#FFFEF9", corner_radius=T.RADIUS_SM, border_width=1, border_color=T.BORDER_LIGHT)
     receipt_frame.pack(fill="both", expand=True, padx=24, pady=(0, 12))
 
-    receipt = build_receipt_text(invoice, items)
     body = ctk.CTkTextbox(
         receipt_frame,
         font=("Courier New", 15),
@@ -99,6 +111,15 @@ def show_receipt_viewer(parent, invoice: Invoice, items: list[InvoiceItem], is_p
         ctk.CTkButton(footer, text="Print Receipt", command=do_print, **T.success_button_kwargs(width=150)).pack(side="right", padx=(0, 10))
 
     dialog.update_idletasks()
-    px = parent.winfo_rootx() + max(0, (parent.winfo_width() - 480) // 2)
-    py = parent.winfo_rooty() + max(0, (parent.winfo_height() - 720) // 2)
-    dialog.geometry(f"480x720+{px}+{py}")
+    try:
+        px = parent.winfo_rootx() + max(0, (parent.winfo_width() - 480) // 2)
+        py = parent.winfo_rooty() + max(0, (parent.winfo_height() - 720) // 2)
+        dialog.geometry(f"480x720+{px}+{py}")
+    except Exception:
+        pass
+    try:
+        dialog.grab_set()
+    except Exception:
+        pass
+    dialog.lift()
+    dialog.focus_force()
