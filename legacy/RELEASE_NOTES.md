@@ -1,19 +1,16 @@
-## Retail Invoice 1.6.0
+## Retail Invoice 1.6.14
 
-Download `RetailInvoice-1.6.0-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.14-Windows.exe`, double-click, and go.
 
-### What’s new
+### Fixes
 
-- **Batch product import** — On Products, download an Excel/CSV template (SKU, Product Name, Details, Qty, Price), fill it in (or use Google Sheets), then Import
-- **Discount before or after tax** on New Sale (default in Setup)
-- **Scrollable totals / notes** rail for 125% Windows display scaling
-- Uniform **Save Next (F5)** / **Save Close (F6)** on Add Product
-- After **F12**: **F7 Cash** / **F8 Card**, then **F12** to confirm
-- Blank line between items on printed receipts
+- **Show totals** shows the money / tax / count / average cards again (no empty gray bar)
+- **Export PDF / Monthly totals** work for ranges longer than ~45 days (no longer load every line item just to export)
 
-### Hotkeys
+### Also recent
 
-F1 New · F2 Products · F3 Sales · F4 Setup · F5/F6 product save · F10 Save · F11 Preview · F12 Complete + Print · F7/F8 payment · F12 confirm
+- 1.6.13: From/To date range + View receipt reload
+- 1.6.12: Products search row + SKU on receipts
 
 ### Requirements
 
