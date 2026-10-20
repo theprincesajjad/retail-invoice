@@ -292,8 +292,8 @@ class InventoryTab(ctk.CTkFrame):
     def sync_inventory_excel(self):
         """
         Sync the local inventory Excel:
-          - Pull new/edited products from the spreadsheet into the app
-          - Rewrite the spreadsheet with current Status / qty / date sold
+          - Pull new/edited products from every category tab into the app
+          - Rewrite with one worksheet per category (adds missing category tabs)
         """
         path = resolve_inventory_excel_path()
         if not path.exists():
@@ -304,6 +304,7 @@ class InventoryTab(ctk.CTkFrame):
                 (
                     f"No inventory Excel found yet.\n\n"
                     f"Create one at:\n{path}\n\n"
+                    "The file uses one tab per category (Laptops, Cell Phones, …).\n"
                     "You can change the location with Choose Excel…"
                 ),
                 confirm_label="Create & sync",

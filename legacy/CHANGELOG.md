@@ -2,6 +2,17 @@
 
 All notable changes to Retail Invoice are documented here.
 
+## [1.6.17] — 2026-10-20
+
+### Inventory Excel
+
+- `inventory.xlsx` uses **one worksheet tab per category** (Laptops, Desktops, Monitors, Printers, Cell Phones, Tablets, plus any extra categories)
+- Sync creates missing category tabs and places new/imported products on the matching tab
+- Rows typed into a category tab inherit that category when Category is blank
+- Older single-sheet workbooks still import; the next sync upgrades them to category tabs
+
+---
+
 ## [1.6.16] — 2026-10-16
 
 ### Products
