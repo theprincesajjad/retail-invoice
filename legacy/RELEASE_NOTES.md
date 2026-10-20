@@ -1,15 +1,18 @@
-## Retail Invoice 1.6.16
+## Retail Invoice 1.6.17
 
-Download `RetailInvoice-1.6.16-Windows.exe`, double-click, and go.
+Download `RetailInvoice-1.6.17-Windows.exe`, double-click, and go.
 
-### Products
+### Inventory Excel
 
-- **Stock** pull-down (between Search and Category): In stock only, Out of stock only, or All items — so the list stays small when you’re selling, and you can still find sold/out-of-stock items when you need them
+- `inventory.xlsx` is split into **one tab per category**
+- Sync adds any missing category tabs and keeps products on the matching sheet
+- Type new SKUs into a category tab — they import under that category
+- Old single-sheet files still sync; Sync upgrades them to category tabs
 
 ### Also recent
 
+- 1.6.16: Stock filter (in / out / all) on Products
 - 1.6.15: Quarterly exports, category filter, New Sale SKU column
-- 1.6.14: Show totals layout + long-range PDF exports
 
 ### Requirements
 
